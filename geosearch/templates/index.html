@@ -1,324 +1,6 @@
-<!-- core/templates/index.html -->
 {% extends 'base.html' %}
 
 {% block title %}Поиск исполнителей рядом с вами{% endblock %}
-
-{% block extra_css %}
-<style>
-    /* Шапка */
-    .header {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        background: white;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        z-index: 100;
-        padding: 16px 0;
-    }
-
-    .header-content {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 0 20px;
-    }
-
-    .logo {
-        font-size: 24px;
-        font-weight: 800;
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        cursor: pointer;
-    }
-
-    .nav-buttons {
-        display: flex;
-        gap: 12px;
-    }
-
-    /* Карта */
-    #map {
-        height: 100vh;
-        width: 100%;
-        position: relative;
-    }
-
-    /* Поисковая панель */
-    .search-panel {
-        position: fixed;
-        top: 80px;
-        left: 20px;
-        right: 20px;
-        z-index: 99;
-        max-width: 380px;
-        background: white;
-        border-radius: 20px;
-        box-shadow: 0 20px 35px -10px rgba(0,0,0,0.2);
-        overflow: hidden;
-        transition: all 0.3s ease;
-    }
-
-    .search-panel.minimized {
-        max-width: 60px;
-        cursor: pointer;
-    }
-
-    .search-panel.minimized .panel-content {
-        display: none;
-    }
-
-    .search-header {
-        padding: 16px 20px;
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-        color: white;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .search-header h3 {
-        font-size: 16px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .panel-content {
-        padding: 20px;
-    }
-
-    .location-btn {
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        color: white;
-        width: 100%;
-        padding: 14px;
-        border-radius: 14px;
-        margin-bottom: 20px;
-    }
-
-    .filter-group {
-        margin-bottom: 20px;
-    }
-
-    .filter-group label {
-        display: block;
-        font-size: 13px;
-        font-weight: 600;
-        margin-bottom: 8px;
-        color: #4b5563;
-    }
-
-    .filter-group select,
-    .filter-group input {
-        width: 100%;
-        padding: 12px;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        font-size: 14px;
-        font-family: 'Inter', sans-serif;
-        transition: all 0.3s ease;
-    }
-
-    .filter-group select:focus,
-    .filter-group input:focus {
-        outline: none;
-        border-color: #6366f1;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-    }
-
-    .radius-value {
-        display: inline-block;
-        margin-left: 8px;
-        color: #6366f1;
-        font-weight: 600;
-    }
-
-    .search-btn {
-        width: 100%;
-        padding: 14px;
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-        color: white;
-        border: none;
-        border-radius: 14px;
-        font-weight: 600;
-        margin-top: 10px;
-    }
-
-    /* Результаты поиска */
-    .results-panel {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: white;
-        border-radius: 24px 24px 0 0;
-        box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
-        max-height: 40vh;
-        overflow-y: auto;
-        z-index: 98;
-        transition: transform 0.3s ease;
-    }
-
-    .results-panel.minimized {
-        transform: translateY(calc(100% - 60px));
-    }
-
-    .results-header {
-        padding: 16px 20px;
-        background: white;
-        border-bottom: 1px solid #e5e7eb;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        cursor: pointer;
-        position: sticky;
-        top: 0;
-        background: white;
-        z-index: 1;
-    }
-
-    .results-header h4 {
-        font-size: 16px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .results-list {
-        padding: 20px;
-    }
-
-    /* Карточка исполнителя */
-    .performer-card {
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        padding: 16px;
-        margin-bottom: 12px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-
-    .performer-card:hover {
-        transform: translateX(4px);
-        border-color: #6366f1;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
-    }
-
-    .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: start;
-        margin-bottom: 12px;
-    }
-
-    .performer-name {
-        font-weight: 700;
-        font-size: 16px;
-        color: #1f2937;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .verified-badge {
-        background: #10b981;
-        color: white;
-        font-size: 10px;
-        padding: 2px 6px;
-        border-radius: 20px;
-    }
-
-    .rating {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        color: #fbbf24;
-        font-size: 13px;
-    }
-
-    .rating span {
-        color: #6b7280;
-        margin-left: 4px;
-    }
-
-    .card-details {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 12px;
-        font-size: 13px;
-        color: #6b7280;
-    }
-
-    .category-badge {
-        background: #f3f4f6;
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 600;
-        color: #6366f1;
-    }
-
-    .price {
-        color: #10b981;
-        font-weight: 700;
-        font-size: 14px;
-    }
-
-    /* Пустое состояние */
-    .empty-state {
-        text-align: center;
-        padding: 40px 20px;
-        color: #9ca3af;
-    }
-
-    .empty-state i {
-        font-size: 48px;
-        margin-bottom: 16px;
-    }
-
-    /* Адаптивность */
-    @media (max-width: 768px) {
-        .search-panel {
-            max-width: calc(100% - 40px);
-        }
-
-        .results-panel {
-            max-height: 50vh;
-        }
-
-        .nav-buttons .btn span {
-            display: none;
-        }
-
-        .nav-buttons .btn {
-            padding: 10px 12px;
-        }
-    }
-
-    @media (min-width: 1024px) {
-        .results-panel {
-            left: auto;
-            right: 20px;
-            top: 80px;
-            bottom: auto;
-            max-height: 70vh;
-            width: 380px;
-            border-radius: 20px;
-            box-shadow: 0 20px 35px -10px rgba(0,0,0,0.2);
-        }
-
-        .results-panel.minimized {
-            transform: translateX(calc(100% + 20px));
-        }
-    }
-</style>
-{% endblock %}
 
 {% block content %}
 <!-- Шапка -->
@@ -341,27 +23,23 @@
 </header>
 
 <!-- Карта -->
-<div id="map"></div>
+<div class="map-wrapper">
+    <div id="map"></div>
+</div>
 
 <!-- Панель поиска -->
 <div class="search-panel" id="searchPanel">
     <div class="search-header" onclick="toggleSearchPanel()">
-        <h3>
-            <i class="fas fa-search"></i>
-            Поиск исполнителей
-        </h3>
+        <h3><i class="fas fa-search"></i> Поиск исполнителей</h3>
         <i class="fas fa-chevron-down" id="searchToggleIcon"></i>
     </div>
     <div class="panel-content">
-        <button class="btn location-btn" onclick="getUserLocation()">
-            <i class="fas fa-location-dot"></i>
-            Определить моё местоположение
+        <button class="location-btn" onclick="getUserLocation()">
+            <i class="fas fa-location-dot"></i> Определить моё местоположение
         </button>
 
         <div class="filter-group">
-            <label>
-                <i class="fas fa-tag"></i> Категория услуги
-            </label>
+            <label><i class="fas fa-tag"></i> Категория услуги</label>
             <select id="category">
                 <option value="">Все категории</option>
                 <option value="cleaning">🧹 Уборка</option>
@@ -370,24 +48,19 @@
                 <option value="construction">🏗️ Строительство</option>
                 <option value="design">🎨 Дизайн</option>
                 <option value="photography">📸 Фотография</option>
-                <option value="it">💻 IT и программирование</option>
+                <option value="it">💻 IT</option>
                 <option value="education">📚 Образование</option>
                 <option value="beauty">💅 Красота</option>
-                <option value="other">📌 Другое</option>
             </select>
         </div>
 
         <div class="filter-group">
-            <label>
-                <i class="fas fa-chart-line"></i> Радиус поиска
-                <span class="radius-value" id="radiusValue">10</span> км
-            </label>
+            <label><i class="fas fa-chart-line"></i> Радиус поиска <span class="radius-value" id="radiusValue">10</span> км</label>
             <input type="range" id="radius" min="1" max="50" value="10" step="1">
         </div>
 
-        <button class="btn search-btn" onclick="searchPerformers()">
-            <i class="fas fa-search"></i>
-            Найти исполнителей
+        <button class="search-btn" onclick="searchPerformers()">
+            <i class="fas fa-search"></i> Найти исполнителей
         </button>
     </div>
 </div>
@@ -395,10 +68,7 @@
 <!-- Панель результатов -->
 <div class="results-panel minimized" id="resultsPanel">
     <div class="results-header" onclick="toggleResultsPanel()">
-        <h4>
-            <i class="fas fa-users"></i>
-            <span id="resultsCount">0</span> исполнителей найдено
-        </h4>
+        <h4><i class="fas fa-users"></i> <span id="resultsCount">0</span> исполнителей найдено</h4>
         <i class="fas fa-chevron-up" id="resultsToggleIcon"></i>
     </div>
     <div class="results-list" id="resultsList">
@@ -409,98 +79,84 @@
     </div>
 </div>
 
-<!-- Auth Modal -->
+<!-- Модальные окна -->
 <div id="authModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 400px;">
-        <div style="padding: 24px;">
-            <h2 style="margin-bottom: 24px; text-align: center;">Вход в аккаунт</h2>
-            <form id="loginForm">
-                <div class="filter-group">
-                    <label>Телефон или Email</label>
-                    <input type="text" id="loginUsername" required>
-                </div>
-                <div class="filter-group">
-                    <label>Пароль</label>
-                    <input type="password" id="loginPassword" required>
-                </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">Войти</button>
-            </form>
-            <p style="text-align: center; margin-top: 16px;">
-                Нет аккаунта?
-                <a href="#" onclick="showRegisterModal()" style="color: #6366f1;">Зарегистрироваться</a>
-            </p>
-        </div>
+    <div class="modal-content">
+        <h2 style="margin-bottom: 24px; text-align: center;">Вход в аккаунт</h2>
+        <form id="loginForm">
+            <div class="filter-group">
+                <label>Имя пользователя</label>
+                <input type="text" id="loginUsername" required>
+            </div>
+            <div class="filter-group">
+                <label>Пароль</label>
+                <input type="password" id="loginPassword" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Войти</button>
+        </form>
+        <p style="text-align: center; margin-top: 16px;">
+            Нет аккаунта? <a href="#" onclick="showRegisterModal()" style="color: #6366f1;">Зарегистрироваться</a>
+        </p>
     </div>
 </div>
 
-<!-- Register Modal -->
 <div id="registerModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 400px;">
-        <div style="padding: 24px;">
-            <h2 style="margin-bottom: 24px; text-align: center;">Регистрация</h2>
-            <form id="registerForm">
-                <div class="filter-group">
-                    <label>Имя пользователя</label>
-                    <input type="text" id="regUsername" required>
-                </div>
-                <div class="filter-group">
-                    <label>Телефон</label>
-                    <input type="tel" id="regPhone" required>
-                </div>
-                <div class="filter-group">
-                    <label>Пароль</label>
-                    <input type="password" id="regPassword" required>
-                </div>
-                <div class="filter-group">
-                    <label>Подтвердите пароль</label>
-                    <input type="password" id="regPassword2" required>
-                </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">Зарегистрироваться</button>
-            </form>
-        </div>
+    <div class="modal-content">
+        <h2 style="margin-bottom: 24px; text-align: center;">Регистрация</h2>
+        <form id="registerForm">
+            <div class="filter-group">
+                <label>Имя пользователя</label>
+                <input type="text" id="regUsername" required>
+            </div>
+            <div class="filter-group">
+                <label>Телефон</label>
+                <input type="tel" id="regPhone" required>
+            </div>
+            <div class="filter-group">
+                <label>Пароль</label>
+                <input type="password" id="regPassword" required>
+            </div>
+            <div class="filter-group">
+                <label>Подтвердите пароль</label>
+                <input type="password" id="regPassword2" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Зарегистрироваться</button>
+        </form>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Глобальные переменные
     let map;
     let userMarker;
     let performerMarkers = [];
     let currentLocation = null;
-    let currentUser = null;
 
     // Инициализация карты
     function initMap() {
         map = L.map('map').setView([55.751244, 37.618423], 12);
-
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CartoDB',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
             subdomains: 'abcd',
             maxZoom: 19
         }).addTo(map);
 
-        // Получить локацию при загрузке
         setTimeout(() => {
             getUserLocation();
-        }, 1000);
+        }, 500);
     }
 
     // Получение геолокации
     function getUserLocation() {
         if (navigator.geolocation) {
-            showNotification('Определяем ваше местоположение...', 'info');
+            showNotification('Определяем местоположение...');
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    setUserLocation(lat, lng);
-                    searchPerformers();
+                    setUserLocation(position.coords.latitude, position.coords.longitude);
                 },
                 (error) => {
                     showNotification('Ошибка: ' + error.message, 'error');
-                    // Центр Москвы по умолчанию
                     setUserLocation(55.751244, 37.618423);
                 }
             );
@@ -513,100 +169,60 @@
     function setUserLocation(lat, lng) {
         currentLocation = { lat, lng };
 
-        if (userMarker) {
-            map.removeLayer(userMarker);
-        }
+        if (userMarker) map.removeLayer(userMarker);
 
-        const customIcon = L.divIcon({
-            html: '<div style="background: #6366f1; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 2px #6366f1;"></div>',
-            iconSize: [20, 20],
-            className: 'pulse-marker'
-        });
-
-        userMarker = L.marker([lat, lng], { icon: customIcon })
-            .addTo(map)
-            .bindPopup('Вы здесь')
-            .openPopup();
+        userMarker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                html: '<div style="background: #6366f1; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white;"></div>',
+                iconSize: [20, 20]
+            })
+        }).addTo(map).bindPopup('Вы здесь').openPopup();
 
         map.setView([lat, lng], 14);
-
-        // Добавим круг радиуса
-        if (window.radiusCircle) {
-            map.removeLayer(window.radiusCircle);
-        }
-
-        const radius = document.getElementById('radius').value;
-        window.radiusCircle = L.circle([lat, lng], {
-            color: '#6366f1',
-            fillColor: '#6366f1',
-            fillOpacity: 0.1,
-            radius: radius * 1000
-        }).addTo(map);
+        searchPerformers();
     }
 
     // Поиск исполнителей
     async function searchPerformers() {
         if (!currentLocation) {
-            showNotification('Сначала определите ваше местоположение', 'error');
+            showNotification('Сначала определите местоположение', 'error');
             return;
         }
 
-        const category = document.getElementById('category').value;
-        const radius = document.getElementById('radius').value;
-
-        // Показываем загрузку
         const resultsList = document.getElementById('resultsList');
-        resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Поиск исполнителей...</p></div>';
+        resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Поиск...</p></div>';
 
-        // Обновляем круг на карте
-        if (window.radiusCircle) {
-            map.removeLayer(window.radiusCircle);
-        }
-        window.radiusCircle = L.circle([currentLocation.lat, currentLocation.lng], {
-            color: '#6366f1',
-            fillColor: '#6366f1',
-            fillOpacity: 0.1,
-            radius: radius * 1000
-        }).addTo(map);
-
-        try {
-            // Имитация API запроса (позже заменим на реальный)
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Демо-данные
+        // Демо-данные
+        setTimeout(() => {
             const mockPerformers = generateMockPerformers();
             displayPerformers(mockPerformers);
             addMarkersToMap(mockPerformers);
-
-        } catch (error) {
-            console.error('Ошибка поиска:', error);
-            showNotification('Ошибка при поиске исполнителей', 'error');
-        }
+        }, 1000);
     }
 
     // Генерация демо-данных
     function generateMockPerformers() {
+        const names = ['Анна', 'Михаил', 'Екатерина', 'Дмитрий', 'Ольга'];
         const categories = ['cleaning', 'repair', 'delivery', 'it', 'design'];
-        const names = ['Анна', 'Михаил', 'Екатерина', 'Дмитрий', 'Ольга', 'Сергей', 'Мария', 'Алексей'];
-
         const performers = [];
-        for (let i = 0; i < 8; i++) {
-            const angle = (i / 8) * Math.PI * 2;
-            const distance = Math.random() * 5; // км
+
+        for (let i = 0; i < 5; i++) {
+            const angle = (i / 5) * Math.PI * 2;
+            const distance = Math.random() * 5;
             const lat = currentLocation.lat + (distance / 111) * Math.cos(angle);
             const lng = currentLocation.lng + (distance / 111) * Math.sin(angle);
 
             performers.push({
                 id: i + 1,
-                username: names[Math.floor(Math.random() * names.length)],
+                username: names[i],
                 rating: (Math.random() * 2 + 3).toFixed(1),
                 distance_km: distance.toFixed(1),
                 phone: '+7 (999) 123-45-67',
                 profile: {
-                    categories: categories[Math.floor(Math.random() * categories.length)],
-                    price_per_hour: Math.floor(Math.random() * 2000) + 500,
-                    description: 'Профессиональный исполнитель с опытом работы более 5 лет',
-                    work_experience: Math.floor(Math.random() * 10) + 1
+                    categories: categories[i],
+                    price_per_hour: Math.floor(Math.random() * 1500) + 500,
+                    description: 'Опытный специалист',
+                    work_experience: Math.floor(Math.random() * 5) + 1
                 },
                 location: { coordinates: [lng, lat] }
             });
@@ -622,236 +238,103 @@
         resultsCount.textContent = performers.length;
 
         if (performers.length === 0) {
-            resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-frown"></i><p>Исполнителей не найдено</p></div>';
+            resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-frown"></i><p>Ничего не найдено</p></div>';
             return;
         }
 
-        const categoryMap = {
-            'cleaning': '🧹 Уборка', 'repair': '🔧 Ремонт', 'delivery': '🚚 Доставка',
-            'construction': '🏗️ Строительство', 'design': '🎨 Дизайн', 'photography': '📸 Фотография',
-            'it': '💻 IT', 'education': '📚 Образование', 'beauty': '💅 Красота'
-        };
-
-        resultsList.innerHTML = performers.map(performer => `
-            <div class="performer-card" onclick="showPerformerDetails(${JSON.stringify(performer).replace(/"/g, '&quot;')})">
+        resultsList.innerHTML = performers.map(p => `
+            <div class="performer-card" onclick="showPerformerDetails(${JSON.stringify(p).replace(/"/g, '&quot;')})">
                 <div class="card-header">
-                    <div class="performer-name">
-                        ${performer.username}
-                        ${performer.rating > 4.5 ? '<span class="verified-badge"><i class="fas fa-check"></i> PRO</span>' : ''}
-                    </div>
-                    <div class="rating">
-                        ${'★'.repeat(Math.floor(performer.rating))}${'☆'.repeat(5 - Math.floor(performer.rating))}
-                        <span>${performer.rating}</span>
-                    </div>
+                    <div class="performer-name">${p.username}</div>
+                    <div class="rating">⭐ ${p.rating}</div>
                 </div>
                 <div class="card-details">
-                    <div class="category-badge">
-                        ${categoryMap[performer.profile.categories] || performer.profile.categories}
-                    </div>
-                    <div class="price">
-                        ${performer.profile.price_per_hour} ₽/час
-                    </div>
-                    <div>
-                        📍 ${performer.distance_km} км
-                    </div>
-                </div>
-                <div style="font-size: 13px; color: #6b7280;">
-                    ⭐ ${performer.profile.work_experience} лет опыта
+                    <span class="category-badge">${p.profile.categories}</span>
+                    <span class="price">${p.profile.price_per_hour} ₽/час</span>
+                    <span>📍 ${p.distance_km} км</span>
                 </div>
             </div>
         `).join('');
 
-        // Показать панель результатов
         document.getElementById('resultsPanel').classList.remove('minimized');
     }
 
-    // Добавление маркеров на карту
+    // Добавление маркеров
     function addMarkersToMap(performers) {
-        // Удаляем старые маркеры
-        performerMarkers.forEach(marker => map.removeLayer(marker));
+        performerMarkers.forEach(m => map.removeLayer(m));
         performerMarkers = [];
 
-        performers.forEach(performer => {
-            if (performer.location && performer.location.coordinates) {
-                const [lng, lat] = performer.location.coordinates;
-
-                const customIcon = L.divIcon({
-                    html: `<div style="background: white; border: 2px solid #6366f1; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #6366f1; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                            ${performer.profile.price_per_hour ? '💰' : '👤'}
-                          </div>`,
-                    iconSize: [32, 32],
-                    className: 'performer-marker'
-                });
-
-                const marker = L.marker([lat, lng], { icon: customIcon })
-                    .addTo(map)
-                    .bindPopup(`
-                        <div style="min-width: 200px;">
-                            <strong>${performer.username}</strong><br>
-                            ⭐ ${performer.rating}<br>
-                            📍 ${performer.distance_km} км<br>
-                            💰 ${performer.profile.price_per_hour} ₽/час<br>
-                            <button onclick="showPerformerDetails(${JSON.stringify(performer).replace(/"/g, '&quot;')})"
-                                    style="margin-top: 8px; padding: 6px 12px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer;">
-                                Подробнее
-                            </button>
-                        </div>
-                    `);
-
+        performers.forEach(p => {
+            if (p.location && p.location.coordinates) {
+                const [lng, lat] = p.location.coordinates;
+                const marker = L.marker([lat, lng]).addTo(map)
+                    .bindPopup(`<b>${p.username}</b><br>⭐ ${p.rating}<br>💰 ${p.profile.price_per_hour} ₽/час`);
                 performerMarkers.push(marker);
             }
         });
-
-        // Подогнать карту под все маркеры
-        if (performerMarkers.length > 0 && userMarker) {
-            const bounds = [userMarker.getLatLng()];
-            performerMarkers.forEach(marker => bounds.push(marker.getLatLng()));
-            map.fitBounds(bounds, { padding: [50, 50] });
-        }
     }
 
-    // Показать детали исполнителя
     function showPerformerDetails(performer) {
         const modal = document.getElementById('modalOverlay');
-        const categoryMap = {
-            'cleaning': 'Уборка', 'repair': 'Ремонт', 'delivery': 'Доставка',
-            'construction': 'Строительство', 'design': 'Дизайн', 'photography': 'Фотография',
-            'it': 'IT', 'education': 'Образование', 'beauty': 'Красота'
-        };
-
         modal.innerHTML = `
-            <div class="modal-content" style="max-width: 500px;">
-                <div style="padding: 24px;">
-                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
-                        <h2>${performer.username}</h2>
-                        <button onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
-                    </div>
-
-                    <div style="margin-bottom: 16px;">
-                        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                            <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;">⭐ ${performer.rating}</span>
-                            <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;">📞 ${performer.phone}</span>
-                        </div>
-                        <div style="margin-bottom: 12px;">
-                            <strong>📁 Категория:</strong> ${categoryMap[performer.profile.categories]}
-                        </div>
-                        <div style="margin-bottom: 12px;">
-                            <strong>💰 Цена:</strong> ${performer.profile.price_per_hour} ₽/час
-                        </div>
-                        <div style="margin-bottom: 12px;">
-                            <strong>📅 Опыт:</strong> ${performer.profile.work_experience} лет
-                        </div>
-                        <div style="margin-bottom: 20px;">
-                            <strong>📝 О себе:</strong><br>
-                            ${performer.profile.description}
-                        </div>
-                    </div>
-
-                    <button class="btn btn-primary" style="width: 100%;" onclick="createOrder(${performer.id})">
-                        <i class="fas fa-check-circle"></i>
-                        Заказать услугу
-                    </button>
-                    <button class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="closeModal()">
-                        Закрыть
-                    </button>
-                </div>
+            <div class="modal-content">
+                <h2>${performer.username}</h2>
+                <p>⭐ Рейтинг: ${performer.rating}</p>
+                <p>📞 ${performer.phone}</p>
+                <p>💰 ${performer.profile.price_per_hour} ₽/час</p>
+                <p>📝 ${performer.profile.description}</p>
+                <button class="btn btn-primary" style="width:100%;margin-top:20px" onclick="closeModal()">Закрыть</button>
             </div>
         `;
-
         modal.style.display = 'flex';
     }
 
-    // Создание заказа
-    function createOrder(performerId) {
-        closeModal();
-        const title = prompt('Название заказа:');
-        if (!title) return;
-
-        const description = prompt('Описание заказа:');
-        if (!description) return;
-
-        const budget = prompt('Бюджет (в рублях):');
-        if (!budget) return;
-
-        showNotification('Заказ отправлен исполнителю!', 'success');
-    }
-
-    // Утилиты
-    function showNotification(message, type = 'info') {
-        const notification = document.getElementById('notification');
-        notification.textContent = message;
-        notification.className = `notification ${type}`;
-        notification.style.display = 'block';
-        setTimeout(() => {
-            notification.style.display = 'none';
-        }, 3000);
+    function showNotification(msg, type = 'info') {
+        const n = document.getElementById('notification');
+        n.textContent = msg;
+        n.style.display = 'block';
+        setTimeout(() => n.style.display = 'none', 3000);
     }
 
     function closeModal() {
         document.getElementById('modalOverlay').style.display = 'none';
-        document.getElementById('modalOverlay').innerHTML = '';
     }
 
     function showAuthModal() {
-        const modal = document.getElementById('authModal');
-        modal.style.display = 'flex';
-
+        document.getElementById('authModal').style.display = 'flex';
         document.getElementById('loginForm').onsubmit = (e) => {
             e.preventDefault();
-            showNotification('Демо-режим: вход успешен', 'success');
+            showNotification('Вход выполнен (демо)');
             closeModal();
         };
     }
 
     function showRegisterModal() {
         closeModal();
-        const modal = document.getElementById('registerModal');
-        modal.style.display = 'flex';
-
+        document.getElementById('registerModal').style.display = 'flex';
         document.getElementById('registerForm').onsubmit = (e) => {
             e.preventDefault();
-            showNotification('Демо-режим: регистрация успешна', 'success');
+            showNotification('Регистрация выполнена (демо)');
             closeModal();
         };
     }
 
     function showPerformerModal() {
-        showNotification('Форма для исполнителей будет доступна позже', 'info');
+        showNotification('Форма для исполнителей в разработке');
     }
 
     function toggleSearchPanel() {
-        const panel = document.getElementById('searchPanel');
-        const icon = document.getElementById('searchToggleIcon');
-        panel.classList.toggle('minimized');
-        icon.classList.toggle('fa-chevron-down');
-        icon.classList.toggle('fa-chevron-up');
+        document.getElementById('searchPanel').classList.toggle('minimized');
     }
 
     function toggleResultsPanel() {
-        const panel = document.getElementById('resultsPanel');
-        const icon = document.getElementById('resultsToggleIcon');
-        panel.classList.toggle('minimized');
-        icon.classList.toggle('fa-chevron-up');
-        icon.classList.toggle('fa-chevron-down');
+        document.getElementById('resultsPanel').classList.toggle('minimized');
     }
 
-    // Обработчики событий
     document.getElementById('radius').addEventListener('input', (e) => {
         document.getElementById('radiusValue').textContent = e.target.value;
-        if (currentLocation) {
-            if (window.radiusCircle) {
-                map.removeLayer(window.radiusCircle);
-            }
-            window.radiusCircle = L.circle([currentLocation.lat, currentLocation.lng], {
-                color: '#6366f1',
-                fillColor: '#6366f1',
-                fillOpacity: 0.1,
-                radius: e.target.value * 1000
-            }).addTo(map);
-        }
     });
 
-    // Инициализация
     window.onload = initMap;
 </script>
 {% endblock %}

@@ -1,3 +1,5 @@
+from http.client import responses
+
 from django.shortcuts import render
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import api_view, action, permission_classes
@@ -12,6 +14,7 @@ from math import radians, sin, cos, sqrt, atan2
 from .models import Profile, Order, Review
 from .serializers import *
 import requests
+from django.conf import settings
 
 # Create your views here.
 class AuthViewSet(viewsets.ViewSet):
@@ -205,9 +208,10 @@ class SearchViewSet(viewsets.ViewSet):
             return Response({'error': 'Адрес обязатателен'}, status=400)
 
         try:
-            responce = requests.get(
-                'https://nominatim.openstreetmap.org/search',
+            response = requests.get(
+                'https://geocode-maps.yandex.ru/1.x/',
                 params={
+                    'apikey': settings.YANDEX_GEOCODER_API_KEY,
                     'q': address,
                     'format': 'json',
                     'limit': 1,
@@ -215,15 +219,22 @@ class SearchViewSet(viewsets.ViewSet):
                 headers={'User-Agent': 'GeoFindApp/1.0'}
             )
 
-            if responce.status_code == 200:
-                data = responce.json()
-                if data:
+            if response.status_code == 200:
+                data = response.json()
+                try:
+                    geo_object = data['response']['GeoObjectObjectCollection']['featureMember'][0]['geoObject']
+                    pos = geo_object['Point']['pos'].split()
+                    longitude, latitude = float(pos[0]), float(pos[1])
+
                     return Response({
-                        'latitude': float(data[0]['lat']),
-                        'longitude': float(data[0]['lon']),
-                        'display_name': data[0]['display_name'],
+                        'latitude': latitude,
+                        'longitude': longitude,
+                        'display_name': geo_object.get('name', address),
+                        'address': geo_object.get('description', address),
                     })
-            return Response({'error': 'Адрес не найден'}, status=404)
+                except (IndexError, KeyError):
+                    return Response({'error': 'Адрес не найден'}, status=404)
+            return Response({'error': 'Ошибка геокодирования'}, status=500)
         except Exception as e:
             return Response({'error': str(e)}, status=500)
 
@@ -235,20 +246,28 @@ class SearchViewSet(viewsets.ViewSet):
 
         try:
             responce = requests.get(
-                'https://nominatim.openstreetmap.org/reverse',
+                'https://geocode-maps.yandex.ru/1.x/',
                 params={
-                    'lat': lat,
-                    'lng': lng,
+                    'apikey': settings.YANDEX_GEOCODER_API_KEY,
+                    'geocode': f"{lat},{lng}",
                     'format': 'json',
+                    'lang': 'ru_RU'
                 },
-                headers={'User-Agent': 'GeoFindApp/1.0'}
+                timeout=10
             )
 
             if responce.status_code == 200:
                 data = responce.json()
-                return Response({
-                    'address': data.get('display_name', ''),
-                })
-            return Response({'error': 'Не удалось определить адресс'}, status=404)
+                try:
+                    geo_object = data['response']['GeoObjectObjectCollection']['featureMember'][0]['geoObject']
+                    address = geo_object['metaDataProperty']['GeocoderMetaData']['text']
+
+                    return Response({
+                        'address': address,
+                        'display_name': address
+                    })
+                except (IndexError, KeyError):
+                    return Response({'error': 'Адрес не найден'}, status=404)
+            return Response({'error': 'Ошибка геокодирования'}, status=500)
         except Exception as e:
             return Response({'error': str(e)}, status=500)

@@ -1,19 +1,15 @@
+<!-- core/templates/base.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>{% block title %}Поиск исполнителей{% endblock %}</title>
+    <title>{% block title %}ElysiumFinder - Поиск исполнителей{% endblock %}</title>
     <meta name="description" content="Быстрый поиск исполнителей рядом с вами">
 
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
-    <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=c13507be-7543-4f94-a29a-698a62bb8bba&lang=ru_RU" type="text/javascript"></script>
 
     <style>
         * {
@@ -30,7 +26,6 @@
             height: 100vh;
         }
 
-        /* Шапка */
         .header {
             position: fixed;
             top: 0;
@@ -65,7 +60,6 @@
             gap: 12px;
         }
 
-        /* Карта */
         .map-wrapper {
             position: fixed;
             top: 70px;
@@ -79,7 +73,6 @@
             height: 100%;
         }
 
-        /* Поисковая панель */
         .search-panel {
             position: fixed;
             top: 90px;
@@ -175,7 +168,6 @@
             cursor: pointer;
         }
 
-        /* Результаты поиска */
         .results-panel {
             position: fixed;
             bottom: 0;
@@ -347,7 +339,6 @@
 
     {% block content %}{% endblock %}
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
     {% block extra_js %}{% endblock %}
 </body>

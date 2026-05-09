@@ -131,3 +131,5 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ]
 }
+
+YANDEX_GEOCODER_API_KEY = 'c13507be-7543-4f94-a29a-698a62bb8bba'

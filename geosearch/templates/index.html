@@ -1,13 +1,13 @@
+<!-- core/templates/index.html -->
 {% extends 'base.html' %}
 
-{% block title %}Поиск исполнителей рядом с вами{% endblock %}
+{% block title %}ElysiumFinder - Поиск исполнителей рядом с вами{% endblock %}
 
 {% block content %}
-<!-- Шапка -->
 <header class="header">
     <div class="header-content">
         <div class="logo" onclick="location.reload()">
-            <i class="fas fa-map-marker-alt"></i> FindMaster
+            <i class="fas fa-map-marker-alt"></i> ElysiumFinder
         </div>
         <div class="nav-buttons">
             <button class="btn btn-primary" onclick="showAuthModal()">
@@ -22,12 +22,10 @@
     </div>
 </header>
 
-<!-- Карта -->
 <div class="map-wrapper">
     <div id="map"></div>
 </div>
 
-<!-- Панель поиска -->
 <div class="search-panel" id="searchPanel">
     <div class="search-header" onclick="toggleSearchPanel()">
         <h3><i class="fas fa-search"></i> Поиск исполнителей</h3>
@@ -65,7 +63,6 @@
     </div>
 </div>
 
-<!-- Панель результатов -->
 <div class="results-panel minimized" id="resultsPanel">
     <div class="results-header" onclick="toggleResultsPanel()">
         <h4><i class="fas fa-users"></i> <span id="resultsCount">0</span> исполнителей найдено</h4>
@@ -79,7 +76,6 @@
     </div>
 </div>
 
-<!-- Модальные окна -->
 <div id="authModal" class="modal-overlay">
     <div class="modal-content">
         <h2 style="margin-bottom: 24px; text-align: center;">Вход в аккаунт</h2>
@@ -129,31 +125,51 @@
 {% block extra_js %}
 <script>
     let map;
-    let userMarker;
-    let performerMarkers = [];
+    let userPlacemark;
+    let performerPlacemarks = [];
     let currentLocation = null;
 
-    // Инициализация карты
-    function initMap() {
-        map = L.map('map').setView([55.751244, 37.618423], 12);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
-            subdomains: 'abcd',
-            maxZoom: 19
-        }).addTo(map);
+    function waitForYmaps() {
+        return new Promise((resolve) => {
+            if (typeof ymaps !== 'undefined') {
+                ymaps.ready(resolve);
+            } else {
+                setTimeout(() => waitForYmaps().then(resolve), 100);
+            }
+        });
+    }
+
+    async function initMap() {
+        await waitForYmaps();
+
+        map = new ymaps.Map('map', {
+            center: [55.751244, 37.618423],
+            zoom: 12,
+            controls: ['zoomControl', 'fullscreenControl', 'typeSelector']
+        });
+
+        const searchControl = new ymaps.control.SearchControl({
+            options: {
+                provider: 'yandex#search',
+                noPlacemark: false,
+                resultsPerPage: 5
+            }
+        });
+        map.controls.add(searchControl);
 
         setTimeout(() => {
             getUserLocation();
         }, 500);
     }
 
-    // Получение геолокации
     function getUserLocation() {
         if (navigator.geolocation) {
             showNotification('Определяем местоположение...');
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    setUserLocation(position.coords.latitude, position.coords.longitude);
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    setUserLocation(lat, lng);
                 },
                 (error) => {
                     showNotification('Ошибка: ' + error.message, 'error');
@@ -165,24 +181,42 @@
         }
     }
 
-    // Установка локации пользователя
     function setUserLocation(lat, lng) {
         currentLocation = { lat, lng };
 
-        if (userMarker) map.removeLayer(userMarker);
+        if (userPlacemark) {
+            map.geoObjects.remove(userPlacemark);
+        }
 
-        userMarker = L.marker([lat, lng], {
-            icon: L.divIcon({
-                html: '<div style="background: #6366f1; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white;"></div>',
-                iconSize: [20, 20]
-            })
-        }).addTo(map).bindPopup('Вы здесь').openPopup();
+        userPlacemark = new ymaps.Placemark([lat, lng], {
+            balloonContent: 'Вы здесь',
+            hintContent: 'Ваше местоположение'
+        }, {
+            preset: 'islands#blueCircleIcon',
+            iconColor: '#6366f1'
+        });
 
-        map.setView([lat, lng], 14);
+        map.geoObjects.add(userPlacemark);
+        map.setCenter([lat, lng], 14);
+
+        if (window.radiusCircle) {
+            map.geoObjects.remove(window.radiusCircle);
+        }
+
+        const radius = document.getElementById('radius').value;
+        window.radiusCircle = new ymaps.Circle([
+            [lat, lng],
+            radius * 1000
+        ], {}, {
+            fillColor: '#6366f120',
+            strokeColor: '#6366f1',
+            strokeWidth: 2
+        });
+        map.geoObjects.add(window.radiusCircle);
+
         searchPerformers();
     }
 
-    // Поиск исполнителей
     async function searchPerformers() {
         if (!currentLocation) {
             showNotification('Сначала определите местоположение', 'error');
@@ -192,7 +226,20 @@
         const resultsList = document.getElementById('resultsList');
         resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Поиск...</p></div>';
 
-        // Демо-данные
+        const radius = document.getElementById('radius').value;
+        if (window.radiusCircle) {
+            map.geoObjects.remove(window.radiusCircle);
+        }
+        window.radiusCircle = new ymaps.Circle([
+            [currentLocation.lat, currentLocation.lng],
+            radius * 1000
+        ], {}, {
+            fillColor: '#6366f120',
+            strokeColor: '#6366f1',
+            strokeWidth: 2
+        });
+        map.geoObjects.add(window.radiusCircle);
+
         setTimeout(() => {
             const mockPerformers = generateMockPerformers();
             displayPerformers(mockPerformers);
@@ -200,15 +247,14 @@
         }, 1000);
     }
 
-    // Генерация демо-данных
     function generateMockPerformers() {
-        const names = ['Анна', 'Михаил', 'Екатерина', 'Дмитрий', 'Ольга'];
-        const categories = ['cleaning', 'repair', 'delivery', 'it', 'design'];
+        const names = ['Анна', 'Михаил', 'Екатерина', 'Дмитрий', 'Ольга', 'Сергей', 'Мария', 'Алексей'];
+        const categories = ['cleaning', 'repair', 'delivery', 'it', 'design', 'photography', 'education', 'beauty'];
         const performers = [];
 
-        for (let i = 0; i < 5; i++) {
-            const angle = (i / 5) * Math.PI * 2;
-            const distance = Math.random() * 5;
+        for (let i = 0; i < Math.min(8, names.length); i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            const distance = Math.random() * 8;
             const lat = currentLocation.lat + (distance / 111) * Math.cos(angle);
             const lng = currentLocation.lng + (distance / 111) * Math.sin(angle);
 
@@ -219,18 +265,18 @@
                 distance_km: distance.toFixed(1),
                 phone: '+7 (999) 123-45-67',
                 profile: {
-                    categories: categories[i],
-                    price_per_hour: Math.floor(Math.random() * 1500) + 500,
-                    description: 'Опытный специалист',
-                    work_experience: Math.floor(Math.random() * 5) + 1
+                    categories: categories[i % categories.length],
+                    price_per_hour: Math.floor(Math.random() * 2000) + 500,
+                    description: 'Профессиональный исполнитель с опытом работы более 5 лет',
+                    work_experience: Math.floor(Math.random() * 10) + 1
                 },
-                location: { coordinates: [lng, lat] }
+                latitude: lat,
+                longitude: lng
             });
         }
         return performers;
     }
 
-    // Отображение исполнителей
     function displayPerformers(performers) {
         const resultsList = document.getElementById('resultsList');
         const resultsCount = document.getElementById('resultsCount');
@@ -242,16 +288,31 @@
             return;
         }
 
+        const categoryMap = {
+            'cleaning': '🧹 Уборка', 'repair': '🔧 Ремонт', 'delivery': '🚚 Доставка',
+            'construction': '🏗️ Строительство', 'design': '🎨 Дизайн', 'photography': '📸 Фотография',
+            'it': '💻 IT', 'education': '📚 Образование', 'beauty': '💅 Красота'
+        };
+
         resultsList.innerHTML = performers.map(p => `
             <div class="performer-card" onclick="showPerformerDetails(${JSON.stringify(p).replace(/"/g, '&quot;')})">
                 <div class="card-header">
-                    <div class="performer-name">${p.username}</div>
-                    <div class="rating">⭐ ${p.rating}</div>
+                    <div class="performer-name">
+                        ${p.username}
+                        ${p.rating > 4.5 ? '<span style="background: #10b981; color: white; font-size: 10px; padding: 2px 6px; border-radius: 20px;"><i class="fas fa-check"></i> PRO</span>' : ''}
+                    </div>
+                    <div class="rating">
+                        ${'★'.repeat(Math.floor(p.rating))}${'☆'.repeat(5 - Math.floor(p.rating))}
+                        <span>${p.rating}</span>
+                    </div>
                 </div>
                 <div class="card-details">
-                    <span class="category-badge">${p.profile.categories}</span>
+                    <span class="category-badge">${categoryMap[p.profile.categories] || p.profile.categories}</span>
                     <span class="price">${p.profile.price_per_hour} ₽/час</span>
                     <span>📍 ${p.distance_km} км</span>
+                </div>
+                <div style="font-size: 13px; color: #6b7280;">
+                    ⭐ ${p.profile.work_experience} лет опыта
                 </div>
             </div>
         `).join('');
@@ -259,41 +320,113 @@
         document.getElementById('resultsPanel').classList.remove('minimized');
     }
 
-    // Добавление маркеров
     function addMarkersToMap(performers) {
-        performerMarkers.forEach(m => map.removeLayer(m));
-        performerMarkers = [];
+        performerPlacemarks.forEach(placemark => map.geoObjects.remove(placemark));
+        performerPlacemarks = [];
 
-        performers.forEach(p => {
-            if (p.location && p.location.coordinates) {
-                const [lng, lat] = p.location.coordinates;
-                const marker = L.marker([lat, lng]).addTo(map)
-                    .bindPopup(`<b>${p.username}</b><br>⭐ ${p.rating}<br>💰 ${p.profile.price_per_hour} ₽/час`);
-                performerMarkers.push(marker);
+        performers.forEach(performer => {
+            if (performer.latitude && performer.longitude) {
+                const placemark = new ymaps.Placemark(
+                    [performer.latitude, performer.longitude],
+                    {
+                        balloonContent: `
+                            <div style="min-width: 200px;">
+                                <strong>${performer.username}</strong><br>
+                                ⭐ ${performer.rating}<br>
+                                📍 ${performer.distance_km} км<br>
+                                💰 ${performer.profile.price_per_hour} ₽/час<br>
+                                <button onclick="showPerformerDetails(${JSON.stringify(performer).replace(/"/g, '&quot;')})"
+                                        style="margin-top: 8px; padding: 6px 12px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                                    Подробнее
+                                </button>
+                            </div>
+                        `,
+                        hintContent: performer.username
+                    },
+                    {
+                        preset: 'islands#greenBusinessIcon',
+                        iconColor: '#10b981'
+                    }
+                );
+
+                map.geoObjects.add(placemark);
+                performerPlacemarks.push(placemark);
             }
         });
+
+        if (performerPlacemarks.length > 0 && userPlacemark) {
+            const bounds = [userPlacemark.geometry.getCoordinates()];
+            performerPlacemarks.forEach(p => bounds.push(p.geometry.getCoordinates()));
+            map.setBounds(bounds, { checkZoomRange: true });
+        }
     }
 
     function showPerformerDetails(performer) {
         const modal = document.getElementById('modalOverlay');
+        const categoryMap = {
+            'cleaning': 'Уборка', 'repair': 'Ремонт', 'delivery': 'Доставка',
+            'construction': 'Строительство', 'design': 'Дизайн', 'photography': 'Фотография',
+            'it': 'IT', 'education': 'Образование', 'beauty': 'Красота'
+        };
+
         modal.innerHTML = `
             <div class="modal-content">
-                <h2>${performer.username}</h2>
-                <p>⭐ Рейтинг: ${performer.rating}</p>
-                <p>📞 ${performer.phone}</p>
-                <p>💰 ${performer.profile.price_per_hour} ₽/час</p>
-                <p>📝 ${performer.profile.description}</p>
-                <button class="btn btn-primary" style="width:100%;margin-top:20px" onclick="closeModal()">Закрыть</button>
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                    <h2>${performer.username}</h2>
+                    <button onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                        <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;">⭐ ${performer.rating}</span>
+                        <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;">📞 ${performer.phone}</span>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong>📁 Категория:</strong> ${categoryMap[performer.profile.categories] || performer.profile.categories}
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong>💰 Цена:</strong> ${performer.profile.price_per_hour} ₽/час
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong>📅 Опыт:</strong> ${performer.profile.work_experience} лет
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <strong>📝 О себе:</strong><br>
+                        ${performer.profile.description}
+                    </div>
+                </div>
+                <button class="btn btn-primary" style="width: 100%;" onclick="createOrder(${performer.id})">
+                    <i class="fas fa-check-circle"></i> Заказать услугу
+                </button>
+                <button class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="closeModal()">
+                    Закрыть
+                </button>
             </div>
         `;
         modal.style.display = 'flex';
     }
 
-    function showNotification(msg, type = 'info') {
-        const n = document.getElementById('notification');
-        n.textContent = msg;
-        n.style.display = 'block';
-        setTimeout(() => n.style.display = 'none', 3000);
+    function createOrder(performerId) {
+        closeModal();
+        const title = prompt('Название заказа:');
+        if (!title) return;
+
+        const description = prompt('Описание заказа:');
+        if (!description) return;
+
+        const budget = prompt('Бюджет (в рублях):');
+        if (!budget) return;
+
+        showNotification('Заказ отправлен исполнителю!', 'success');
+    }
+
+    function showNotification(message, type = 'info') {
+        const notification = document.getElementById('notification');
+        notification.textContent = message;
+        notification.className = `notification ${type}`;
+        notification.style.display = 'block';
+        setTimeout(() => {
+            notification.style.display = 'none';
+        }, 3000);
     }
 
     function closeModal() {
@@ -301,38 +434,64 @@
     }
 
     function showAuthModal() {
-        document.getElementById('authModal').style.display = 'flex';
+        const modal = document.getElementById('authModal');
+        modal.style.display = 'flex';
+
         document.getElementById('loginForm').onsubmit = (e) => {
             e.preventDefault();
-            showNotification('Вход выполнен (демо)');
+            showNotification('Демо-режим: вход успешен', 'success');
             closeModal();
+            document.getElementById('authModal').style.display = 'none';
         };
     }
 
     function showRegisterModal() {
-        closeModal();
-        document.getElementById('registerModal').style.display = 'flex';
+        document.getElementById('authModal').style.display = 'none';
+        const modal = document.getElementById('registerModal');
+        modal.style.display = 'flex';
+
         document.getElementById('registerForm').onsubmit = (e) => {
             e.preventDefault();
-            showNotification('Регистрация выполнена (демо)');
+            showNotification('Демо-режим: регистрация успешна', 'success');
             closeModal();
+            document.getElementById('registerModal').style.display = 'none';
         };
     }
 
     function showPerformerModal() {
-        showNotification('Форма для исполнителей в разработке');
+        showNotification('Форма для исполнителей в разработке', 'info');
     }
 
     function toggleSearchPanel() {
-        document.getElementById('searchPanel').classList.toggle('minimized');
+        const panel = document.getElementById('searchPanel');
+        const icon = document.getElementById('searchToggleIcon');
+        panel.classList.toggle('minimized');
+        icon.classList.toggle('fa-chevron-down');
+        icon.classList.toggle('fa-chevron-up');
     }
 
     function toggleResultsPanel() {
-        document.getElementById('resultsPanel').classList.toggle('minimized');
+        const panel = document.getElementById('resultsPanel');
+        const icon = document.getElementById('resultsToggleIcon');
+        panel.classList.toggle('minimized');
+        icon.classList.toggle('fa-chevron-up');
+        icon.classList.toggle('fa-chevron-down');
     }
 
     document.getElementById('radius').addEventListener('input', (e) => {
         document.getElementById('radiusValue').textContent = e.target.value;
+        if (currentLocation && window.radiusCircle) {
+            map.geoObjects.remove(window.radiusCircle);
+            window.radiusCircle = new ymaps.Circle([
+                [currentLocation.lat, currentLocation.lng],
+                e.target.value * 1000
+            ], {}, {
+                fillColor: '#6366f120',
+                strokeColor: '#6366f1',
+                strokeWidth: 2
+            });
+            map.geoObjects.add(window.radiusCircle);
+        }
     });
 
     window.onload = initMap;

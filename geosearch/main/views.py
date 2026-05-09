@@ -108,6 +108,7 @@ class ProfileViewSet(viewsets.ModelViewSet):
 
 class OrderViewSet(viewsets.ModelViewSet):
     """Управление заказами"""
+    queryset = Order.objects.all()
     serializer_class = OrderSerializer
     permission_classes = [AllowAny]
 

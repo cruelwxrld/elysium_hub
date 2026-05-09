@@ -1,5 +1,5 @@
-<!-- core/templates/index.html -->
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}ElysiumFinder - Поиск исполнителей рядом с вами{% endblock %}
 
@@ -7,7 +7,8 @@
 <header class="header">
     <div class="header-content">
         <div class="logo" onclick="location.reload()">
-            <i class="fas fa-map-marker-alt"></i> ElysiumFinder
+            <img src="{% static 'images/elysium.png' %}" alt="ElysiumFinder">
+            <span>ElysiumFinder</span>
         </div>
         <div class="nav-buttons">
             <button class="btn btn-primary" onclick="showAuthModal()">
@@ -78,6 +79,9 @@
 
 <div id="authModal" class="modal-overlay">
     <div class="modal-content">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <i class="fas fa-user-circle" style="font-size: 60px; color: #6366f1;"></i>
+        </div>
         <h2 style="margin-bottom: 24px; text-align: center;">Вход в аккаунт</h2>
         <form id="loginForm">
             <div class="filter-group">
@@ -98,6 +102,9 @@
 
 <div id="registerModal" class="modal-overlay">
     <div class="modal-content">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <i class="fas fa-user-plus" style="font-size: 60px; color: #6366f1;"></i>
+        </div>
         <h2 style="margin-bottom: 24px; text-align: center;">Регистрация</h2>
         <form id="registerForm">
             <div class="filter-group">
@@ -298,7 +305,7 @@
             <div class="performer-card" onclick="showPerformerDetails(${JSON.stringify(p).replace(/"/g, '&quot;')})">
                 <div class="card-header">
                     <div class="performer-name">
-                        ${p.username}
+                        <i class="fas fa-user-circle"></i> ${p.username}
                         ${p.rating > 4.5 ? '<span style="background: #10b981; color: white; font-size: 10px; padding: 2px 6px; border-radius: 20px;"><i class="fas fa-check"></i> PRO</span>' : ''}
                     </div>
                     <div class="rating">
@@ -307,12 +314,12 @@
                     </div>
                 </div>
                 <div class="card-details">
-                    <span class="category-badge">${categoryMap[p.profile.categories] || p.profile.categories}</span>
-                    <span class="price">${p.profile.price_per_hour} ₽/час</span>
-                    <span>📍 ${p.distance_km} км</span>
+                    <span class="category-badge"><i class="fas fa-tag"></i> ${categoryMap[p.profile.categories] || p.profile.categories}</span>
+                    <span class="price"><i class="fas fa-ruble-sign"></i> ${p.profile.price_per_hour}/час</span>
+                    <span><i class="fas fa-location-dot"></i> ${p.distance_km} км</span>
                 </div>
                 <div style="font-size: 13px; color: #6b7280;">
-                    ⭐ ${p.profile.work_experience} лет опыта
+                    <i class="fas fa-star"></i> ${p.profile.work_experience} лет опыта
                 </div>
             </div>
         `).join('');
@@ -372,25 +379,25 @@
         modal.innerHTML = `
             <div class="modal-content">
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
-                    <h2>${performer.username}</h2>
+                    <h2><i class="fas fa-user-circle"></i> ${performer.username}</h2>
                     <button onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
                 </div>
                 <div style="margin-bottom: 16px;">
                     <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                        <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;">⭐ ${performer.rating}</span>
-                        <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;">📞 ${performer.phone}</span>
+                        <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;"><i class="fas fa-star"></i> ${performer.rating}</span>
+                        <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;"><i class="fas fa-phone"></i> ${performer.phone}</span>
                     </div>
                     <div style="margin-bottom: 12px;">
-                        <strong>📁 Категория:</strong> ${categoryMap[performer.profile.categories] || performer.profile.categories}
+                        <strong><i class="fas fa-tag"></i> Категория:</strong> ${categoryMap[performer.profile.categories] || performer.profile.categories}
                     </div>
                     <div style="margin-bottom: 12px;">
-                        <strong>💰 Цена:</strong> ${performer.profile.price_per_hour} ₽/час
+                        <strong><i class="fas fa-ruble-sign"></i> Цена:</strong> ${performer.profile.price_per_hour} ₽/час
                     </div>
                     <div style="margin-bottom: 12px;">
-                        <strong>📅 Опыт:</strong> ${performer.profile.work_experience} лет
+                        <strong><i class="fas fa-calendar"></i> Опыт:</strong> ${performer.profile.work_experience} лет
                     </div>
                     <div style="margin-bottom: 20px;">
-                        <strong>📝 О себе:</strong><br>
+                        <strong><i class="fas fa-info-circle"></i> О себе:</strong><br>
                         ${performer.profile.description}
                     </div>
                 </div>
@@ -398,7 +405,7 @@
                     <i class="fas fa-check-circle"></i> Заказать услугу
                 </button>
                 <button class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="closeModal()">
-                    Закрыть
+                    <i class="fas fa-times"></i> Закрыть
                 </button>
             </div>
         `;
@@ -416,12 +423,12 @@
         const budget = prompt('Бюджет (в рублях):');
         if (!budget) return;
 
-        showNotification('Заказ отправлен исполнителю!', 'success');
+        showNotification('✅ Заказ отправлен исполнителю!', 'success');
     }
 
     function showNotification(message, type = 'info') {
         const notification = document.getElementById('notification');
-        notification.textContent = message;
+        notification.innerHTML = message;
         notification.className = `notification ${type}`;
         notification.style.display = 'block';
         setTimeout(() => {
@@ -439,7 +446,7 @@
 
         document.getElementById('loginForm').onsubmit = (e) => {
             e.preventDefault();
-            showNotification('Демо-режим: вход успешен', 'success');
+            showNotification('✅ Демо-режим: вход успешен', 'success');
             closeModal();
             document.getElementById('authModal').style.display = 'none';
         };
@@ -452,14 +459,14 @@
 
         document.getElementById('registerForm').onsubmit = (e) => {
             e.preventDefault();
-            showNotification('Демо-режим: регистрация успешна', 'success');
+            showNotification('✅ Демо-режим: регистрация успешна', 'success');
             closeModal();
             document.getElementById('registerModal').style.display = 'none';
         };
     }
 
     function showPerformerModal() {
-        showNotification('Форма для исполнителей в разработке', 'info');
+        showNotification('ℹ️ Форма для исполнителей в разработке', 'info');
     }
 
     function toggleSearchPanel() {

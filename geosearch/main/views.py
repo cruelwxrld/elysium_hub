@@ -1,22 +1,18 @@
-from http.client import responses
-
 from django.shortcuts import render
-from rest_framework import viewsets, status, filters
-from rest_framework.decorators import api_view, action, permission_classes
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny
 from rest_framework.authtoken.models import Token
-from rest_framework.authtoken.views import ObtainAuthToken
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-from django.db.models import Q
 from math import radians, sin, cos, sqrt, atan2
 from .models import Profile, Order, Review
 from .serializers import *
 import requests
 from django.conf import settings
 
-# Create your views here.
+
 class AuthViewSet(viewsets.ViewSet):
     """API для аутентификации"""
     permission_classes = [AllowAny]
@@ -26,7 +22,8 @@ class AuthViewSet(viewsets.ViewSet):
         """Регистрация пользователя"""
         username = request.data.get('username')
         password = request.data.get('password')
-        email = request.data.get('email')
+        email = request.data.get('email', '')
+        phone = request.data.get('phone', '')
         role = request.data.get('role', 'client')
 
         if not username or not password:
@@ -35,37 +32,75 @@ class AuthViewSet(viewsets.ViewSet):
         if User.objects.filter(username=username).exists():
             return Response({'error': 'Пользователь уже существует'}, status=400)
 
-        user = User.objects.create_user(username=username, password=password, email=email)
-        user.profile.role = role
-        user.profile.save()
+        try:
+            user = User.objects.create_user(username=username, password=password, email=email)
 
-        token, _ = Token.objects.get_or_create(user=user)
+            Profile.objects.create(
+                user=user,
+                phone=phone,
+                role=role,
+                is_available=True,
+                rating=0,
+                completed_orders=0
+            )
 
-        return Response({
-            'token': token.key,
-            'user_id': user.id,
-            'username': user.username,
-            'role': role
-        })
+            token, _ = Token.objects.get_or_create(user=user)
+
+            return Response({
+                'success': True,
+                'token': token.key,
+                'user_id': user.id,
+                'username': user.username,
+                'role': role,
+                'message': 'Регистрация успешна'
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)
 
     @action(detail=False, methods=['post'])
     def login(self, request):
-        """Вход пользователю"""
+        """Вход пользователя"""
         username = request.data.get('username')
         password = request.data.get('password')
 
+        if not username or not password:
+            return Response({'error': 'Логин и пароль обязательны'}, status=400)
+
         user = authenticate(username=username, password=password)
+
         if not user:
             return Response({'error': 'Неверные учетные данные'}, status=401)
+
+        try:
+            profile = user.profile
+        except Profile.DoesNotExist:
+            profile = Profile.objects.create(
+                user=user,
+                role='client',
+                is_available=True,
+                rating=0,
+                completed_orders=0
+            )
 
         token, _ = Token.objects.get_or_create(user=user)
 
         return Response({
+            'success': True,
             'token': token.key,
             'user_id': user.id,
             'username': user.username,
-            'role': user.profile.role
+            'role': profile.role,
+            'message': f'Добро пожаловать, {user.username}!'
         })
+
+    @action(detail=False, methods=['post'])
+    def logout(self, request):
+        """Выход пользователя"""
+        if request.user.is_authenticated:
+            Token.objects.filter(user=request.user).delete()
+            return Response({'success': True, 'message': 'Вы вышли из системы'})
+        return Response({'error': 'Вы не авторизованы'}, status=401)
+
 
 class ProfileViewSet(viewsets.ModelViewSet):
     """Управление профилем"""
@@ -75,7 +110,7 @@ class ProfileViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get', 'put'])
     def me(self, request):
-        """Обновить свой профиль"""
+        """Получить или обновить свой профиль"""
         if not request.user.is_authenticated:
             return Response({'error': 'Требуется авторизация'}, status=401)
 
@@ -109,6 +144,7 @@ class ProfileViewSet(viewsets.ModelViewSet):
 
         return Response({'status': 'ok', 'latitude': lat, 'longitude': lng})
 
+
 class OrderViewSet(viewsets.ModelViewSet):
     """Управление заказами"""
     queryset = Order.objects.all()
@@ -116,6 +152,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
+        """Фильтрация заказов по параметрам"""
         queryset = Order.objects.all()
 
         status_filter = self.request.query_params.get('status')
@@ -136,13 +173,16 @@ class OrderViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-created_at')
 
     def perform_create(self, serializer):
+        """Создание заказа с текущим пользователем как клиентом"""
         serializer.save(client=self.request.user)
+
 
 class SearchViewSet(viewsets.ViewSet):
     """Поиск исполнителей"""
     permission_classes = [AllowAny]
 
     def calculate_distance(self, lat1, lon1, lat2, lon2):
+        """Расчет расстояния между двумя точками в километрах"""
         R = 6373.0
 
         lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
@@ -156,7 +196,7 @@ class SearchViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'])
     def find_performers(self, request):
-        """Поиск исполнителей по геолокации"""
+        """Поиск исполнителей по геолокации и радиусу"""
         lat = request.query_params.get('lat')
         lng = request.query_params.get('lng')
         radius = float(request.query_params.get('radius', 10))
@@ -202,27 +242,27 @@ class SearchViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'])
     def geocode(self, request):
-        """Преобразование адреса в координаты"""
+        """Преобразование адреса в координаты через Яндекс.Геокодер"""
         address = request.query_params.get('address')
         if not address:
-            return Response({'error': 'Адрес обязатателен'}, status=400)
+            return Response({'error': 'Адрес обязателен'}, status=400)
 
         try:
             response = requests.get(
                 'https://geocode-maps.yandex.ru/1.x/',
                 params={
                     'apikey': settings.YANDEX_GEOCODER_API_KEY,
-                    'q': address,
+                    'geocode': address,
                     'format': 'json',
                     'limit': 1,
                 },
-                headers={'User-Agent': 'GeoFindApp/1.0'}
+                timeout=10
             )
 
             if response.status_code == 200:
                 data = response.json()
                 try:
-                    geo_object = data['response']['GeoObjectObjectCollection']['featureMember'][0]['geoObject']
+                    geo_object = data['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']
                     pos = geo_object['Point']['pos'].split()
                     longitude, latitude = float(pos[0]), float(pos[1])
 
@@ -240,26 +280,29 @@ class SearchViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'])
     def reverse_geocode(self, request):
-        """Преобразование координат в адресс"""
+        """Преобразование координат в адрес через Яндекс.Геокодер"""
         lat = request.query_params.get('lat')
         lng = request.query_params.get('lng')
 
+        if not lat or not lng:
+            return Response({'error': 'lat и lng обязательны'}, status=400)
+
         try:
-            responce = requests.get(
+            response = requests.get(
                 'https://geocode-maps.yandex.ru/1.x/',
                 params={
                     'apikey': settings.YANDEX_GEOCODER_API_KEY,
-                    'geocode': f"{lat},{lng}",
+                    'geocode': f"{lng},{lat}",
                     'format': 'json',
                     'lang': 'ru_RU'
                 },
                 timeout=10
             )
 
-            if responce.status_code == 200:
-                data = responce.json()
+            if response.status_code == 200:
+                data = response.json()
                 try:
-                    geo_object = data['response']['GeoObjectObjectCollection']['featureMember'][0]['geoObject']
+                    geo_object = data['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']
                     address = geo_object['metaDataProperty']['GeocoderMetaData']['text']
 
                     return Response({
@@ -271,3 +314,8 @@ class SearchViewSet(viewsets.ViewSet):
             return Response({'error': 'Ошибка геокодирования'}, status=500)
         except Exception as e:
             return Response({'error': str(e)}, status=500)
+
+
+def home(request):
+    """Главная страница"""
+    return render(request, 'index.html')

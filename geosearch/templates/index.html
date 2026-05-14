@@ -1,23 +1,23 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}ElysiumFinder - Поиск исполнителей рядом с вами{% endblock %}
+{% block title %}Elysium{% endblock %}
 
 {% block content %}
 <header class="header">
     <div class="header-content">
         <div class="logo" onclick="location.reload()">
             <img src="{% static 'images/elysium.png' %}" alt="ElysiumFinder">
-            <span>ElysiumFinder</span>
+            <span>Elysium</span>
         </div>
-        <div class="nav-buttons">
+        <div class="nav-buttons" id="navButtons">
             <button class="btn btn-primary" onclick="showAuthModal()">
                 <i class="fas fa-user"></i>
                 <span>Войти</span>
             </button>
-            <button class="btn btn-secondary" onclick="showPerformerModal()">
-                <i class="fas fa-briefcase"></i>
-                <span>Стать исполнителем</span>
+            <button class="btn btn-secondary" onclick="showRegisterModal()">
+                <i class="fas fa-user-plus"></i>
+                <span>Регистрация</span>
             </button>
         </div>
     </div>
@@ -79,11 +79,13 @@
 
 <div id="authModal" class="modal-overlay">
     <div class="modal-content">
-        <div style="text-align: center; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="width: 30px;"></div>
             <i class="fas fa-user-circle" style="font-size: 60px; color: #6366f1;"></i>
+            <button onclick="closeModal()" style="background: none; border: none; font-size: 28px; cursor: pointer; color: #6b7280;">&times;</button>
         </div>
         <h2 style="margin-bottom: 24px; text-align: center;">Вход в аккаунт</h2>
-        <form id="loginForm">
+        <form onsubmit="event.preventDefault(); login();">
             <div class="filter-group">
                 <label>Имя пользователя</label>
                 <input type="text" id="loginUsername" required>
@@ -95,25 +97,31 @@
             <button type="submit" class="btn btn-primary" style="width: 100%;">Войти</button>
         </form>
         <p style="text-align: center; margin-top: 16px;">
-            Нет аккаунта? <a href="#" onclick="showRegisterModal()" style="color: #6366f1;">Зарегистрироваться</a>
+            Нет аккаунта? <a href="#" onclick="switchToRegister()" style="color: #6366f1;">Зарегистрироваться</a>
         </p>
     </div>
 </div>
 
 <div id="registerModal" class="modal-overlay">
     <div class="modal-content">
-        <div style="text-align: center; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="width: 30px;"></div>
             <i class="fas fa-user-plus" style="font-size: 60px; color: #6366f1;"></i>
+            <button onclick="closeModal()" style="background: none; border: none; font-size: 28px; cursor: pointer; color: #6b7280;">&times;</button>
         </div>
         <h2 style="margin-bottom: 24px; text-align: center;">Регистрация</h2>
-        <form id="registerForm">
+        <form onsubmit="event.preventDefault(); register();">
             <div class="filter-group">
                 <label>Имя пользователя</label>
                 <input type="text" id="regUsername" required>
             </div>
             <div class="filter-group">
+                <label>Email</label>
+                <input type="email" id="regEmail">
+            </div>
+            <div class="filter-group">
                 <label>Телефон</label>
-                <input type="tel" id="regPhone" required>
+                <input type="tel" id="regPhone">
             </div>
             <div class="filter-group">
                 <label>Пароль</label>
@@ -123,8 +131,18 @@
                 <label>Подтвердите пароль</label>
                 <input type="password" id="regPassword2" required>
             </div>
+            <div class="filter-group">
+                <label>Регистрация как</label>
+                <select id="regRole">
+                    <option value="client">Заказчик</option>
+                    <option value="performer">Исполнитель</option>
+                </select>
+            </div>
             <button type="submit" class="btn btn-primary" style="width: 100%;">Зарегистрироваться</button>
         </form>
+        <p style="text-align: center; margin-top: 16px;">
+            Уже есть аккаунт? <a href="#" onclick="switchToLogin()" style="color: #6366f1;">Войти</a>
+        </p>
     </div>
 </div>
 {% endblock %}
@@ -135,6 +153,161 @@
     let userPlacemark;
     let performerPlacemarks = [];
     let currentLocation = null;
+
+    function closeModal() {
+        document.getElementById('authModal').style.display = 'none';
+        document.getElementById('registerModal').style.display = 'none';
+        document.getElementById('modalOverlay').style.display = 'none';
+    }
+
+    function showAuthModal() {
+        closeModal();
+        document.getElementById('authModal').style.display = 'flex';
+    }
+
+    function showRegisterModal() {
+        closeModal();
+        document.getElementById('registerModal').style.display = 'flex';
+    }
+
+    function switchToRegister() {
+        closeModal();
+        showRegisterModal();
+    }
+
+    function switchToLogin() {
+        closeModal();
+        showAuthModal();
+    }
+
+    document.addEventListener('click', function(event) {
+        if (event.target === document.getElementById('authModal')) closeModal();
+        if (event.target === document.getElementById('registerModal')) closeModal();
+    });
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') closeModal();
+    });
+
+    async function login() {
+        const username = document.getElementById('loginUsername').value;
+        const password = document.getElementById('loginPassword').value;
+
+        if (!username || !password) {
+            showNotification('Заполните все поля', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth/login/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                localStorage.setItem('authToken', data.token);
+                localStorage.setItem('username', data.username);
+                showNotification(`Добро пожаловать, ${data.username}!`, 'success');
+                closeModal();
+                updateUIForLoggedInUser(data.username);
+            } else {
+                showNotification(data.error || 'Ошибка входа', 'error');
+            }
+        } catch (error) {
+            showNotification('Ошибка соединения', 'error');
+        }
+    }
+
+    async function register() {
+        const username = document.getElementById('regUsername').value;
+        const password = document.getElementById('regPassword').value;
+        const password2 = document.getElementById('regPassword2').value;
+        const email = document.getElementById('regEmail').value;
+        const phone = document.getElementById('regPhone').value;
+        const role = document.getElementById('regRole').value;
+
+        if (!username || !password) {
+            showNotification('Заполните обязательные поля', 'error');
+            return;
+        }
+
+        if (password !== password2) {
+            showNotification('Пароли не совпадают', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth/register/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, email, phone, role })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                localStorage.setItem('authToken', data.token);
+                localStorage.setItem('username', data.username);
+                showNotification('Регистрация успешна!', 'success');
+                closeModal();
+                updateUIForLoggedInUser(data.username);
+            } else {
+                showNotification(data.error || 'Ошибка регистрации', 'error');
+            }
+        } catch (error) {
+            showNotification('Ошибка соединения', 'error');
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('username');
+        showNotification('Вы вышли из системы', 'info');
+        updateUIForLoggedOutUser();
+    }
+
+    function updateUIForLoggedInUser(username) {
+        const navButtons = document.getElementById('navButtons');
+        if (navButtons) {
+            navButtons.innerHTML = `
+                <span class="btn btn-secondary">
+                    <i class="fas fa-user"></i>
+                    <span>${username}</span>
+                </span>
+                <button class="btn btn-outline" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Выйти</span>
+                </button>
+            `;
+        }
+    }
+
+    function updateUIForLoggedOutUser() {
+        const navButtons = document.getElementById('navButtons');
+        if (navButtons) {
+            navButtons.innerHTML = `
+                <button class="btn btn-primary" onclick="showAuthModal()">
+                    <i class="fas fa-user"></i>
+                    <span>Войти</span>
+                </button>
+                <button class="btn btn-secondary" onclick="showRegisterModal()">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Регистрация</span>
+                </button>
+            `;
+        }
+    }
+
+    function checkAuthOnLoad() {
+        const token = localStorage.getItem('authToken');
+        const username = localStorage.getItem('username');
+        if (token && username) {
+            updateUIForLoggedInUser(username);
+        }
+    }
 
     function waitForYmaps() {
         return new Promise((resolve) => {
@@ -148,359 +321,206 @@
 
     async function initMap() {
         await waitForYmaps();
-
         map = new ymaps.Map('map', {
             center: [55.751244, 37.618423],
             zoom: 12,
             controls: ['zoomControl', 'fullscreenControl', 'typeSelector']
         });
-
         const searchControl = new ymaps.control.SearchControl({
-            options: {
-                provider: 'yandex#search',
-                noPlacemark: false,
-                resultsPerPage: 5
-            }
+            options: { provider: 'yandex#search', noPlacemark: false, resultsPerPage: 5 }
         });
         map.controls.add(searchControl);
-
-        setTimeout(() => {
-            getUserLocation();
-        }, 500);
+        setTimeout(() => getUserLocation(), 500);
     }
 
     function getUserLocation() {
         if (navigator.geolocation) {
             showNotification('Определяем местоположение...');
             navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    setUserLocation(lat, lng);
-                },
-                (error) => {
-                    showNotification('Ошибка: ' + error.message, 'error');
-                    setUserLocation(55.751244, 37.618423);
-                }
+                (position) => setUserLocation(position.coords.latitude, position.coords.longitude),
+                () => setUserLocation(55.751244, 37.618423)
             );
         } else {
-            showNotification('Геолокация не поддерживается', 'error');
+            setUserLocation(55.751244, 37.618423);
         }
     }
 
     function setUserLocation(lat, lng) {
         currentLocation = { lat, lng };
-
-        if (userPlacemark) {
-            map.geoObjects.remove(userPlacemark);
-        }
-
+        if (userPlacemark) map.geoObjects.remove(userPlacemark);
         userPlacemark = new ymaps.Placemark([lat, lng], {
             balloonContent: 'Вы здесь',
             hintContent: 'Ваше местоположение'
-        }, {
-            preset: 'islands#blueCircleIcon',
-            iconColor: '#6366f1'
-        });
-
+        }, { preset: 'islands#blueCircleIcon', iconColor: '#6366f1' });
         map.geoObjects.add(userPlacemark);
         map.setCenter([lat, lng], 14);
-
-        if (window.radiusCircle) {
-            map.geoObjects.remove(window.radiusCircle);
-        }
-
-        const radius = document.getElementById('radius').value;
-        window.radiusCircle = new ymaps.Circle([
-            [lat, lng],
-            radius * 1000
-        ], {}, {
-            fillColor: '#6366f120',
-            strokeColor: '#6366f1',
-            strokeWidth: 2
-        });
-        map.geoObjects.add(window.radiusCircle);
-
+        updateRadiusCircle();
         searchPerformers();
     }
 
-    async function searchPerformers() {
-        if (!currentLocation) {
-            showNotification('Сначала определите местоположение', 'error');
-            return;
-        }
-
-        const resultsList = document.getElementById('resultsList');
-        resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Поиск...</p></div>';
-
+    function updateRadiusCircle() {
+        if (!currentLocation) return;
         const radius = document.getElementById('radius').value;
-        if (window.radiusCircle) {
-            map.geoObjects.remove(window.radiusCircle);
-        }
-        window.radiusCircle = new ymaps.Circle([
-            [currentLocation.lat, currentLocation.lng],
-            radius * 1000
-        ], {}, {
-            fillColor: '#6366f120',
-            strokeColor: '#6366f1',
-            strokeWidth: 2
+        if (window.radiusCircle) map.geoObjects.remove(window.radiusCircle);
+        window.radiusCircle = new ymaps.Circle([[currentLocation.lat, currentLocation.lng], radius * 1000], {}, {
+            fillColor: '#6366f120', strokeColor: '#6366f1', strokeWidth: 2
         });
         map.geoObjects.add(window.radiusCircle);
-
-        setTimeout(() => {
-            const mockPerformers = generateMockPerformers();
-            displayPerformers(mockPerformers);
-            addMarkersToMap(mockPerformers);
-        }, 1000);
     }
 
-    function generateMockPerformers() {
-        const names = ['Анна', 'Михаил', 'Екатерина', 'Дмитрий', 'Ольга', 'Сергей', 'Мария', 'Алексей'];
-        const categories = ['cleaning', 'repair', 'delivery', 'it', 'design', 'photography', 'education', 'beauty'];
-        const performers = [];
+    async function searchPerformers() {
+        if (!currentLocation) return;
+        const resultsList = document.getElementById('resultsList');
+        resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Поиск...</p></div>';
+        updateRadiusCircle();
 
-        for (let i = 0; i < Math.min(8, names.length); i++) {
-            const angle = (i / 8) * Math.PI * 2;
-            const distance = Math.random() * 8;
-            const lat = currentLocation.lat + (distance / 111) * Math.cos(angle);
-            const lng = currentLocation.lng + (distance / 111) * Math.sin(angle);
+        const radius = document.getElementById('radius').value;
+        const category = document.getElementById('category').value;
+        let url = `/api/search/find_performers/?lat=${currentLocation.lat}&lng=${currentLocation.lng}&radius=${radius}`;
+        if (category) url += `&category=${category}`;
 
-            performers.push({
-                id: i + 1,
-                username: names[i],
-                rating: (Math.random() * 2 + 3).toFixed(1),
-                distance_km: distance.toFixed(1),
-                phone: '+7 (999) 123-45-67',
-                profile: {
-                    categories: categories[i % categories.length],
-                    price_per_hour: Math.floor(Math.random() * 2000) + 500,
-                    description: 'Профессиональный исполнитель с опытом работы более 5 лет',
-                    work_experience: Math.floor(Math.random() * 10) + 1
-                },
-                latitude: lat,
-                longitude: lng
-            });
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data.results && data.results.length > 0) {
+                displayPerformers(data.results);
+                addMarkersToMap(data.results);
+            } else {
+                displayPerformers([]);
+            }
+        } catch (error) {
+            resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Ошибка загрузки</p></div>';
         }
-        return performers;
     }
 
     function displayPerformers(performers) {
         const resultsList = document.getElementById('resultsList');
-        const resultsCount = document.getElementById('resultsCount');
-
-        resultsCount.textContent = performers.length;
-
+        document.getElementById('resultsCount').textContent = performers.length;
         if (performers.length === 0) {
-            resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-frown"></i><p>Ничего не найдено</p></div>';
+            resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-frown"></i><p>Исполнителей не найдено</p></div>';
             return;
         }
-
         const categoryMap = {
             'cleaning': '🧹 Уборка', 'repair': '🔧 Ремонт', 'delivery': '🚚 Доставка',
             'construction': '🏗️ Строительство', 'design': '🎨 Дизайн', 'photography': '📸 Фотография',
             'it': '💻 IT', 'education': '📚 Образование', 'beauty': '💅 Красота'
         };
-
         resultsList.innerHTML = performers.map(p => `
             <div class="performer-card" onclick="showPerformerDetails(${JSON.stringify(p).replace(/"/g, '&quot;')})">
                 <div class="card-header">
-                    <div class="performer-name">
-                        <i class="fas fa-user-circle"></i> ${p.username}
-                        ${p.rating > 4.5 ? '<span style="background: #10b981; color: white; font-size: 10px; padding: 2px 6px; border-radius: 20px;"><i class="fas fa-check"></i> PRO</span>' : ''}
-                    </div>
-                    <div class="rating">
-                        ${'★'.repeat(Math.floor(p.rating))}${'☆'.repeat(5 - Math.floor(p.rating))}
-                        <span>${p.rating}</span>
-                    </div>
+                    <div class="performer-name"><i class="fas fa-user-circle"></i> ${p.username || 'Исполнитель'}</div>
+                    <div class="rating">${'★'.repeat(Math.floor(p.rating))}${'☆'.repeat(5 - Math.floor(p.rating))}<span>${p.rating}</span></div>
                 </div>
                 <div class="card-details">
-                    <span class="category-badge"><i class="fas fa-tag"></i> ${categoryMap[p.profile.categories] || p.profile.categories}</span>
-                    <span class="price"><i class="fas fa-ruble-sign"></i> ${p.profile.price_per_hour}/час</span>
+                    <span class="category-badge"><i class="fas fa-tag"></i> ${categoryMap[p.category] || p.category || 'Разное'}</span>
+                    <span class="price"><i class="fas fa-ruble-sign"></i> ${p.price || 'Договорная'}/час</span>
                     <span><i class="fas fa-location-dot"></i> ${p.distance_km} км</span>
-                </div>
-                <div style="font-size: 13px; color: #6b7280;">
-                    <i class="fas fa-star"></i> ${p.profile.work_experience} лет опыта
                 </div>
             </div>
         `).join('');
-
         document.getElementById('resultsPanel').classList.remove('minimized');
     }
 
     function addMarkersToMap(performers) {
-        performerPlacemarks.forEach(placemark => map.geoObjects.remove(placemark));
+        performerPlacemarks.forEach(p => map.geoObjects.remove(p));
         performerPlacemarks = [];
-
-        performers.forEach(performer => {
-            if (performer.latitude && performer.longitude) {
-                const placemark = new ymaps.Placemark(
-                    [performer.latitude, performer.longitude],
-                    {
-                        balloonContent: `
-                            <div style="min-width: 200px;">
-                                <strong>${performer.username}</strong><br>
-                                ⭐ ${performer.rating}<br>
-                                📍 ${performer.distance_km} км<br>
-                                💰 ${performer.profile.price_per_hour} ₽/час<br>
-                                <button onclick="showPerformerDetails(${JSON.stringify(performer).replace(/"/g, '&quot;')})"
-                                        style="margin-top: 8px; padding: 6px 12px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer;">
-                                    Подробнее
-                                </button>
-                            </div>
-                        `,
-                        hintContent: performer.username
-                    },
-                    {
-                        preset: 'islands#greenBusinessIcon',
-                        iconColor: '#10b981'
-                    }
-                );
-
+        performers.forEach(p => {
+            if (p.latitude && p.longitude) {
+                const placemark = new ymaps.Placemark([p.latitude, p.longitude], {
+                    balloonContent: `<strong>${p.username}</strong><br>⭐ ${p.rating}<br>💰 ${p.price} ₽/час`,
+                    hintContent: p.username
+                }, { preset: 'islands#greenBusinessIcon' });
                 map.geoObjects.add(placemark);
                 performerPlacemarks.push(placemark);
             }
         });
-
-        if (performerPlacemarks.length > 0 && userPlacemark) {
-            const bounds = [userPlacemark.geometry.getCoordinates()];
-            performerPlacemarks.forEach(p => bounds.push(p.geometry.getCoordinates()));
-            map.setBounds(bounds, { checkZoomRange: true });
-        }
     }
 
     function showPerformerDetails(performer) {
         const modal = document.getElementById('modalOverlay');
-        const categoryMap = {
-            'cleaning': 'Уборка', 'repair': 'Ремонт', 'delivery': 'Доставка',
-            'construction': 'Строительство', 'design': 'Дизайн', 'photography': 'Фотография',
-            'it': 'IT', 'education': 'Образование', 'beauty': 'Красота'
-        };
-
         modal.innerHTML = `
             <div class="modal-content">
-                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
-                    <h2><i class="fas fa-user-circle"></i> ${performer.username}</h2>
-                    <button onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>${performer.username}</h2>
+                    <button onclick="closeModal()" style="background: none; border: none; font-size: 28px; cursor: pointer;">&times;</button>
                 </div>
-                <div style="margin-bottom: 16px;">
-                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                        <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;"><i class="fas fa-star"></i> ${performer.rating}</span>
-                        <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;"><i class="fas fa-phone"></i> ${performer.phone}</span>
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong><i class="fas fa-tag"></i> Категория:</strong> ${categoryMap[performer.profile.categories] || performer.profile.categories}
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong><i class="fas fa-ruble-sign"></i> Цена:</strong> ${performer.profile.price_per_hour} ₽/час
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong><i class="fas fa-calendar"></i> Опыт:</strong> ${performer.profile.work_experience} лет
-                    </div>
-                    <div style="margin-bottom: 20px;">
-                        <strong><i class="fas fa-info-circle"></i> О себе:</strong><br>
-                        ${performer.profile.description}
-                    </div>
-                </div>
-                <button class="btn btn-primary" style="width: 100%;" onclick="createOrder(${performer.id})">
-                    <i class="fas fa-check-circle"></i> Заказать услугу
-                </button>
-                <button class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="closeModal()">
-                    <i class="fas fa-times"></i> Закрыть
-                </button>
+                <p>⭐ Рейтинг: ${performer.rating}</p>
+                <p>💰 Цена: ${performer.price || 'Договорная'} ₽/час</p>
+                <p>📝 ${performer.description || 'Нет описания'}</p>
+                <button class="btn btn-primary" style="margin-top: 20px; width:100%" onclick="createOrder(${performer.id})">Заказать</button>
+                <button class="btn btn-secondary" style="margin-top: 10px; width:100%" onclick="closeModal()">Закрыть</button>
             </div>
         `;
         modal.style.display = 'flex';
     }
 
-    function createOrder(performerId) {
-        closeModal();
+    async function createOrder(performerId) {
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            showNotification('Сначала войдите в аккаунт', 'error');
+            closeModal();
+            showAuthModal();
+            return;
+        }
         const title = prompt('Название заказа:');
         if (!title) return;
-
-        const description = prompt('Описание заказа:');
+        const description = prompt('Описание:');
         if (!description) return;
-
-        const budget = prompt('Бюджет (в рублях):');
+        const budget = prompt('Бюджет:');
         if (!budget) return;
 
-        showNotification('✅ Заказ отправлен исполнителю!', 'success');
+        try {
+            const response = await fetch('/api/orders/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` },
+                body: JSON.stringify({
+                    title, description, budget,
+                    category: document.getElementById('category').value || 'other',
+                    performer: performerId,
+                    latitude: currentLocation.lat,
+                    longitude: currentLocation.lng,
+                    address: 'По адресу'
+                })
+            });
+            if (response.ok) {
+                showNotification('Заказ создан!', 'success');
+                closeModal();
+            } else {
+                showNotification('Ошибка создания', 'error');
+            }
+        } catch (error) {
+            showNotification('Ошибка соединения', 'error');
+        }
     }
 
-    function showNotification(message, type = 'info') {
+    function showNotification(message, type) {
         const notification = document.getElementById('notification');
-        notification.innerHTML = message;
+        notification.textContent = message;
         notification.className = `notification ${type}`;
         notification.style.display = 'block';
-        setTimeout(() => {
-            notification.style.display = 'none';
-        }, 3000);
-    }
-
-    function closeModal() {
-        document.getElementById('modalOverlay').style.display = 'none';
-    }
-
-    function showAuthModal() {
-        const modal = document.getElementById('authModal');
-        modal.style.display = 'flex';
-
-        document.getElementById('loginForm').onsubmit = (e) => {
-            e.preventDefault();
-            showNotification('✅ Демо-режим: вход успешен', 'success');
-            closeModal();
-            document.getElementById('authModal').style.display = 'none';
-        };
-    }
-
-    function showRegisterModal() {
-        document.getElementById('authModal').style.display = 'none';
-        const modal = document.getElementById('registerModal');
-        modal.style.display = 'flex';
-
-        document.getElementById('registerForm').onsubmit = (e) => {
-            e.preventDefault();
-            showNotification('✅ Демо-режим: регистрация успешна', 'success');
-            closeModal();
-            document.getElementById('registerModal').style.display = 'none';
-        };
-    }
-
-    function showPerformerModal() {
-        showNotification('ℹ️ Форма для исполнителей в разработке', 'info');
+        setTimeout(() => notification.style.display = 'none', 3000);
     }
 
     function toggleSearchPanel() {
-        const panel = document.getElementById('searchPanel');
-        const icon = document.getElementById('searchToggleIcon');
-        panel.classList.toggle('minimized');
-        icon.classList.toggle('fa-chevron-down');
-        icon.classList.toggle('fa-chevron-up');
+        document.getElementById('searchPanel').classList.toggle('minimized');
     }
 
     function toggleResultsPanel() {
-        const panel = document.getElementById('resultsPanel');
-        const icon = document.getElementById('resultsToggleIcon');
-        panel.classList.toggle('minimized');
-        icon.classList.toggle('fa-chevron-up');
-        icon.classList.toggle('fa-chevron-down');
+        document.getElementById('resultsPanel').classList.toggle('minimized');
     }
 
     document.getElementById('radius').addEventListener('input', (e) => {
         document.getElementById('radiusValue').textContent = e.target.value;
         if (currentLocation && window.radiusCircle) {
             map.geoObjects.remove(window.radiusCircle);
-            window.radiusCircle = new ymaps.Circle([
-                [currentLocation.lat, currentLocation.lng],
-                e.target.value * 1000
-            ], {}, {
-                fillColor: '#6366f120',
-                strokeColor: '#6366f1',
-                strokeWidth: 2
+            window.radiusCircle = new ymaps.Circle([[currentLocation.lat, currentLocation.lng], e.target.value * 1000], {}, {
+                fillColor: '#6366f120', strokeColor: '#6366f1', strokeWidth: 2
             });
             map.geoObjects.add(window.radiusCircle);
         }
     });
 
+    checkAuthOnLoad();
     window.onload = initMap;
 </script>
 {% endblock %}

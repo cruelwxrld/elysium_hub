@@ -3,7 +3,6 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-# Create your models here.
 class Profile(models.Model):
     """Профиль пользователя"""
     ROLE_CHOICES = [
@@ -44,12 +43,14 @@ class Profile(models.Model):
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
-    """Автоматическое создание профиля"""
+    """Создает профиль при создании пользователя"""
     if created:
         Profile.objects.create(user=instance)
+        print(f"✅ Профиль создан для пользователя: {instance.username}")
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
+    """Сохраняет профиль при сохранении пользователя"""
     instance.profile.save()
 
 class Order(models.Model):
@@ -71,7 +72,7 @@ class Order(models.Model):
 
     latitude = models.FloatField()
     longitude = models.FloatField()
-    adress = models.CharField(max_length=500)
+    address = models.CharField(max_length=500)
 
     budget = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')

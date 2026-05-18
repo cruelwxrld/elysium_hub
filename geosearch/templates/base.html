@@ -174,7 +174,7 @@
             top: 70px;
             left: 0;
             right: 0;
-            bottom: 0;
+            bottom: 50px;
         }
 
         #map {
@@ -301,7 +301,7 @@
 
         .results-panel {
             position: fixed;
-            bottom: 0;
+            bottom: 50px;
             left: 0;
             right: 0;
             background: white;
@@ -608,6 +608,76 @@
                 flex-direction: column;
             }
         }
+
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            padding: 12px 20px;
+            z-index: 100;
+        }
+
+        .footer-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .footer-left p {
+            font-size: 12px;
+            color: #6b7280;
+            margin: 0;
+        }
+
+        .footer-right {
+            margin-left: auto;
+        }
+
+        .btn-cookie-reset {
+            background: transparent;
+            border: 1px solid #f59e0b;
+            color: #f59e0b;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-cookie-reset:hover {
+            background: #fef3c7;
+            border-color: #d97706;
+            color: #d97706;
+        }
+
+        @media (max-width: 768px) {
+            .footer {
+                padding: 10px 15px;
+            }
+
+            .footer-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-right {
+                margin-left: 0;
+            }
+
+            .btn-cookie-reset span {
+                display: inline;
+            }
+        }
     </style>
 </head>
 <body>
@@ -720,6 +790,20 @@
             </div>
         </div>
     </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-left">
+                <p>&copy; 2024 Elysium. Все права защищены.</p>
+            </div>
+            <div class="footer-right">
+                <button class="btn-cookie-reset" onclick="resetCookiesConsent()">
+                    <i class="fas fa-cookie-bite"></i>
+                    <span>Сбросить настройки cookies</span>
+                </button>
+            </div>
+        </div>
+    </footer>
 
     {% block content %}{% endblock %}
 
@@ -882,6 +966,22 @@
                 }
             }
         }
+
+        function resetCookiesConsent() {
+            if (confirm('Вы уверены, что хотите сбросить настройки cookies?\n\nПосле этого потребуется повторное согласие на использование cookies.')) {
+                deleteCookie('cookie_consent');
+                deleteCookie('cookie_functional');
+                deleteCookie('cookie_analytics');
+
+                localStorage.clear();
+
+                showNotification('Настройки cookies сброшены. Страница перезагрузится.', 'info');
+
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            }
+}
 
         document.addEventListener('DOMContentLoaded', function() {
             checkCookieConsent();

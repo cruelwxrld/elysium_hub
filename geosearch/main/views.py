@@ -1,4 +1,5 @@
-from django.shortcuts import render
+from django.contrib import messages
+from django.shortcuts import render, redirect
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -10,6 +11,7 @@ from math import radians, sin, cos, sqrt, atan2
 from .models import Profile, Order, Review
 from .serializers import *
 import requests
+from django.contrib.auth.decorators import login_required
 from django.conf import settings
 
 
@@ -319,3 +321,118 @@ class SearchViewSet(viewsets.ViewSet):
 def home(request):
     """Главная страница"""
     return render(request, 'index.html')
+
+
+@login_required
+def profile_view(request):
+    """Личный кабинет пользователя"""
+    profile = request.user.profile
+
+    if request.method == 'POST':
+        phone = request.POST.get('phone')
+        address = request.POST.get('address')
+        latitude = request.POST.get('latitude')
+        longitude = request.POST.get('longitude')
+
+        if phone:
+            profile.phone = phone
+        if address:
+            profile.address = address
+        if latitude and longitude:
+            profile.latitude = float(latitude)
+            profile.longitude = float(longitude)
+
+        if profile.role == 'performer':
+            category = request.POST.get('category')
+            price = request.POST.get('price')
+            description = request.POST.get('description')
+
+            if category:
+                profile.category = category
+            if price:
+                profile.price = float(price)
+            if description:
+                profile.description = description
+
+        profile.save()
+        messages.success(request, 'Профиль обновлен')
+        return redirect('profile')
+
+    orders_as_client = Order.objects.filter(client=request.user).order_by('-created_at')[:10]
+    orders_as_performer = Order.objects.filter(performer=request.user).order_by('-created_at')[
+        :10] if profile.role == 'performer' else []
+
+    context = {
+        'profile': profile,
+        'orders_as_client': orders_as_client,
+        'orders_as_performer': orders_as_performer,
+        'categories': Profile.ROLE_CHOICES if hasattr(Profile, 'ROLE_CHOICES') else [],
+    }
+    return render(request, 'profile.html', context)
+
+
+@login_required
+def edit_profile_view(request):
+    """Редактирование профиля"""
+    profile = request.user.profile
+
+    if request.method == 'POST':
+        profile.phone = request.POST.get('phone', profile.phone)
+        profile.address = request.POST.get('address', profile.address)
+
+        if profile.role == 'performer':
+            profile.category = request.POST.get('category', profile.category)
+            profile.price = request.POST.get('price', profile.price)
+            profile.description = request.POST.get('description', profile.description)
+            profile.is_available = request.POST.get('is_available') == 'on'
+
+        profile.save()
+        messages.success(request, 'Профиль успешно обновлен')
+        return redirect('profile')
+
+    context = {
+        'profile': profile,
+        'categories': [
+            ('cleaning', '🧹 Уборка'),
+            ('repair', '🔧 Ремонт'),
+            ('delivery', '🚚 Доставка'),
+            ('construction', '🏗️ Строительство'),
+            ('design', '🎨 Дизайн'),
+            ('photography', '📸 Фотография'),
+            ('it', '💻 IT'),
+            ('education', '📚 Образование'),
+            ('beauty', '💅 Красота'),
+        ],
+    }
+    return render(request, 'edit_profile.html', context)
+
+
+@login_required
+def become_performer_view(request):
+    """Стать исполнителем"""
+    profile = request.user.profile
+
+    if request.method == 'POST':
+        profile.role = 'performer'
+        profile.category = request.POST.get('category')
+        profile.price = request.POST.get('price')
+        profile.description = request.POST.get('description')
+        profile.is_available = True
+        profile.save()
+        messages.success(request, 'Поздравляем! Теперь вы исполнитель')
+        return redirect('profile')
+
+    context = {
+        'categories': [
+            ('cleaning', '🧹 Уборка'),
+            ('repair', '🔧 Ремонт'),
+            ('delivery', '🚚 Доставка'),
+            ('construction', '🏗️ Строительство'),
+            ('design', '🎨 Дизайн'),
+            ('photography', '📸 Фотография'),
+            ('it', '💻 IT'),
+            ('education', '📚 Образование'),
+            ('beauty', '💅 Красота'),
+        ],
+    }
+    return render(request, 'become_performer.html', context)

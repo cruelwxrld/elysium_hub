@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Мой профиль - Elysium{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; margin: 100px auto 40px; padding: 0 20px;">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <h1><i class="fas fa-user-circle"></i> Мой профиль</h1>
+            <a href="{% url 'edit_profile' %}" class="btn btn-primary">
+                <i class="fas fa-edit"></i> Редактировать
+            </a>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px;">
+            <div>
+                <h3><i class="fas fa-info-circle"></i> Основная информация</h3>
+                <div class="info-row">
+                    <strong>Имя пользователя:</strong> {{ user.username }}
+                </div>
+                <div class="info-row">
+                    <strong>Email:</strong> {{ user.email|default:"Не указан" }}
+                </div>
+                <div class="info-row">
+                    <strong>Телефон:</strong> {{ profile.phone|default:"Не указан" }}
+                </div>
+                <div class="info-row">
+                    <strong>Роль:</strong>
+                    {% if profile.role == 'client' %}
+                        <span class="badge">👤 Заказчик</span>
+                    {% elif profile.role == 'performer' %}
+                        <span class="badge">⭐ Исполнитель</span>
+                    {% else %}
+                        <span class="badge">{{ profile.role }}</span>
+                    {% endif %}
+                </div>
+                <div class="info-row">
+                    <strong>Рейтинг:</strong>
+                    <span class="rating">⭐ {{ profile.rating|default:"0" }}</span>
+                </div>
+                <div class="info-row">
+                    <strong>Выполнено заказов:</strong> {{ profile.completed_orders|default:"0" }}
+                </div>
+            </div>
+
+            <div>
+                <h3><i class="fas fa-map-marker-alt"></i> Местоположение</h3>
+                <div class="info-row">
+                    <strong>Адрес:</strong> {{ profile.address|default:"Не указан" }}
+                </div>
+                {% if profile.latitude and profile.longitude %}
+                <div class="info-row">
+                    <strong>Координаты:</strong> {{ profile.latitude }}, {{ profile.longitude }}
+                </div>
+                {% endif %}
+            </div>
+
+            {% if profile.role == 'performer' %}
+            <div>
+                <h3><i class="fas fa-briefcase"></i> Информация об исполнителе</h3>
+                <div class="info-row">
+                    <strong>Категория:</strong>
+                    <span class="category-badge">{{ profile.category|default:"Не указана" }}</span>
+                </div>
+                <div class="info-row">
+                    <strong>Цена за час:</strong>
+                    <span class="price">{{ profile.price|default:"Договорная" }} ₽/час</span>
+                </div>
+                <div class="info-row">
+                    <strong>Статус:</strong>
+                    {% if profile.is_available %}
+                        <span style="color: #10b981;">✅ Доступен</span>
+                    {% else %}
+                        <span style="color: #ef4444;">❌ Недоступен</span>
+                    {% endif %}
+                </div>
+                <div class="info-row">
+                    <strong>О себе:</strong>
+                    <p>{{ profile.description|default:"Не указано" }}</p>
+                </div>
+            </div>
+            {% else %}
+            <div>
+                <h3><i class="fas fa-rocket"></i> Стать исполнителем</h3>
+                <p>Начните зарабатывать, предлагая свои услуги</p>
+                <a href="{% url 'become_performer' %}" class="btn btn-primary" style="margin-top: 15px;">
+                    <i class="fas fa-briefcase"></i> Стать исполнителем
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .info-row {
+        padding: 8px 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .badge {
+        background: #e5e7eb;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+    }
+
+    .category-badge {
+        background: #f3f4f6;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+    }
+
+    .price {
+        color: #10b981;
+        font-weight: 600;
+    }
+
+    .rating {
+        color: #fbbf24;
+    }
+</style>
+{% endblock %}

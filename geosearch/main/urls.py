@@ -11,6 +11,11 @@ router.register(r'search', views.SearchViewSet, basename='search')
 
 urlpatterns = [
     path('api/', include(router.urls)),
-    path('api-token-auth/', obtain_auth_token),
+    path('api-token-auth/', obtain_auth_token, name='api_token_auth'),
+
+    path('profile/', views.profile_view, name='profile'),
+    path('profile/edit/', views.edit_profile_view, name='edit_profile'),
+    path('become-performer/', views.become_performer_view, name='become_performer'),
+
     path('', views.home, name='home'),
 ]

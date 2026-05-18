@@ -507,6 +507,107 @@
                 width: 100px;
             }
         }
+
+        .cookie-consent {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 35px -10px rgba(0,0,0,0.2);
+            z-index: 10001;
+            animation: slideUp 0.3s ease;
+            max-width: 500px;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .cookie-content {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .cookie-icon {
+            text-align: center;
+            font-size: 48px;
+            color: #f59e0b;
+        }
+
+        .cookie-text h3 {
+            margin-bottom: 8px;
+            color: #1f2937;
+        }
+
+        .cookie-text p {
+            font-size: 13px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        .cookie-text a {
+            color: #6366f1;
+            text-decoration: none;
+        }
+
+        .cookie-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .cookie-buttons .btn {
+            flex: 1;
+            justify-content: center;
+        }
+
+        .cookie-option {
+            padding: 12px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .cookie-option label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            margin-bottom: 5px;
+        }
+
+        .cookie-option input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .cookie-desc {
+            font-size: 12px;
+            color: #6b7280;
+            margin-left: 28px;
+        }
+
+        @media (max-width: 768px) {
+            .cookie-consent {
+                left: 10px;
+                right: 10px;
+                bottom: 10px;
+            }
+
+            .cookie-buttons {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
@@ -558,6 +659,68 @@
         </div>
     </header>
 
+    <div id="cookieConsent" class="cookie-consent" style="display: none;">
+        <div class="cookie-content">
+            <div class="cookie-icon">
+                <i class="fas fa-cookie-bite"></i>
+            </div>
+            <div class="cookie-text">
+                <h3>Мы используем cookies</h3>
+                <p>Мы используем файлы cookie для улучшения работы сайта, персонализации и аналитики. Продолжая использовать сайт, вы соглашаетесь с нашей <a href="/privacy/" target="_blank">политикой конфиденциальности</a>.</p>
+            </div>
+            <div class="cookie-buttons">
+                <button class="btn btn-primary" onclick="acceptCookies()">
+                    <i class="fas fa-check"></i> Принять
+                </button>
+                <button class="btn btn-secondary" onclick="declineCookies()">
+                    <i class="fas fa-times"></i> Отклонить
+                </button>
+                <button class="btn btn-outline" onclick="customizeCookies()">
+                    <i class="fas fa-sliders-h"></i> Настроить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="cookieSettings" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2><i class="fas fa-cookie-bite"></i> Настройки cookies</h2>
+                <button onclick="closeCookieSettings()" style="background: none; border: none; font-size: 28px; cursor: pointer;">&times;</button>
+            </div>
+            <p>Выберите, какие типы cookies вы разрешаете:</p>
+
+            <div class="cookie-option">
+                <label>
+                    <input type="checkbox" id="cookieNecessary" checked disabled>
+                    <strong>Необходимые cookies</strong>
+                </label>
+                <p class="cookie-desc">Обеспечивают работу сайта. Не могут быть отключены.</p>
+            </div>
+
+            <div class="cookie-option">
+                <label>
+                    <input type="checkbox" id="cookieFunctional">
+                    <strong>Функциональные cookies</strong>
+                </label>
+                <p class="cookie-desc">Запоминают ваши предпочтения (тема, язык, местоположение).</p>
+            </div>
+
+            <div class="cookie-option">
+                <label>
+                    <input type="checkbox" id="cookieAnalytics">
+                    <strong>Аналитические cookies</strong>
+                </label>
+                <p class="cookie-desc">Помогают нам улучшать работу сайта.</p>
+            </div>
+
+            <div class="cookie-buttons" style="margin-top: 20px;">
+                <button class="btn btn-primary" onclick="saveCookieSettings()">Сохранить настройки</button>
+                <button class="btn btn-secondary" onclick="acceptAllCookies()">Принять все</button>
+            </div>
+        </div>
+    </div>
+
     {% block content %}{% endblock %}
 
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
@@ -606,8 +769,124 @@
             const modal = document.getElementById('registerModal');
             if (modal) modal.style.display = 'flex';
         }
-    </script>
 
+        function setCookie(name, value, days) {
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                const expires = "; expires=" + date.toUTCString();
+                document.cookie = name + "=" + (value || "") + expires + "; path=/";
+            } else {
+                document.cookie = name + "=" + (value || "") + "; path=/";
+            }
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for(let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        function deleteCookie(name) {
+            document.cookie = name + '=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+        }
+
+        function acceptCookies() {
+            setCookie('cookie_consent', 'all', 365);
+            setCookie('cookie_functional', 'true', 365);
+            setCookie('cookie_analytics', 'true', 365);
+            document.getElementById('cookieConsent').style.display = 'none';
+            showNotification('Спасибо! Настройки cookies сохранены.', 'success');
+            setTimeout(() => location.reload(), 1000);
+        }
+
+        function declineCookies() {
+            setCookie('cookie_consent', 'necessary', 365);
+            setCookie('cookie_functional', 'false', 365);
+            setCookie('cookie_analytics', 'false', 365);
+
+            deleteCookie('auth_token');
+            deleteCookie('sessionid');
+            deleteCookie('csrftoken');
+
+            if (!getCookie('cookie_functional') || getCookie('cookie_functional') !== 'true') {
+                localStorage.clear();
+            }
+
+            document.getElementById('cookieConsent').style.display = 'none';
+            showNotification('Cookies отклонены. Некоторые функции могут не работать.', 'info');
+            setTimeout(() => location.reload(), 1000);
+        }
+
+        function customizeCookies() {
+            document.getElementById('cookieSettings').style.display = 'flex';
+        }
+
+        function closeCookieSettings() {
+            document.getElementById('cookieSettings').style.display = 'none';
+        }
+
+        function saveCookieSettings() {
+            const functional = document.getElementById('cookieFunctional').checked;
+            const analytics = document.getElementById('cookieAnalytics').checked;
+
+            setCookie('cookie_consent', 'custom', 365);
+            setCookie('cookie_functional', functional ? 'true' : 'false', 365);
+            setCookie('cookie_analytics', analytics ? 'true' : 'false', 365);
+
+            if (!functional) {
+                deleteCookie('auth_token');
+                localStorage.clear();
+            }
+
+            if (!analytics) {
+                deleteCookie('_ga');
+                deleteCookie('_gid');
+            }
+
+            document.getElementById('cookieSettings').style.display = 'none';
+            document.getElementById('cookieConsent').style.display = 'none';
+            showNotification('Настройки cookies сохранены!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        }
+
+        function acceptAllCookies() {
+            document.getElementById('cookieFunctional').checked = true;
+            document.getElementById('cookieAnalytics').checked = true;
+            saveCookieSettings();
+        }
+
+        function checkCookieConsent() {
+            const consent = getCookie('cookie_consent');
+
+            if (!consent) {
+                setTimeout(() => {
+                    document.getElementById('cookieConsent').style.display = 'block';
+                }, 1000);
+            } else {
+                const functional = getCookie('cookie_functional') === 'true';
+                const analytics = getCookie('cookie_analytics') === 'true';
+
+                if (!functional) {
+                    localStorage.clear();
+                    deleteCookie('auth_token');
+                }
+
+                if (!analytics) {
+                    window['ga-disable-UA-XXXXX-X'] = true;
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            checkCookieConsent();
+        });
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

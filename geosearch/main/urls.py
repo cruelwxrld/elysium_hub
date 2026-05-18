@@ -1,4 +1,5 @@
 from django.urls import path, include
+from django.views.generic import TemplateView
 from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken.views import obtain_auth_token
 from . import views
@@ -20,6 +21,8 @@ urlpatterns = [
     path('become-performer/', views.become_performer_view, name='become_performer'),
 
     path('', views.home, name='home'),
+
+    path('privacy/', TemplateView.as_view(template_name='privacy.html'), name='privacy'),
 
     path('api/categories/<slug:category_slug>/subcategories/', views.SearchViewSet.as_view({'get': 'get_subcategories'}), name='subcategories'),
 ]

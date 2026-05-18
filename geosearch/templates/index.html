@@ -82,7 +82,9 @@
                 <label>Пароль</label>
                 <input type="password" id="loginPassword" required>
             </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%;">Войти</button>
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 14px; justify-content: center; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-sign-in-alt"></i> Войти
+            </button>
         </form>
         <p style="text-align: center; margin-top: 16px;">
             Нет аккаунта? <a href="#" onclick="switchToRegister()" style="color: #6366f1;">Зарегистрироваться</a>
@@ -126,7 +128,9 @@
                     <option value="performer">Исполнитель</option>
                 </select>
             </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%;">Зарегистрироваться</button>
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 14px; justify-content: center; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-user-plus"></i> Зарегистрироваться
+            </button>
         </form>
         <p style="text-align: center; margin-top: 16px;">
             Уже есть аккаунт? <a href="#" onclick="switchToLogin()" style="color: #6366f1;">Войти</a>
@@ -256,6 +260,13 @@
     async function login() {
         const username = document.getElementById('loginUsername').value;
         const password = document.getElementById('loginPassword').value;
+
+        const functionalAllowed = getCookie('cookie_functional') === 'true';
+
+        if (!functionalAllowed && getCookie('cookie_consent') === 'custom') {
+            showNotification('Функциональные cookies отключены. Вход невозможен.', 'error');
+            return;
+        }
 
         if (!username || !password) {
             showNotification('Заполните все поля', 'error');
@@ -560,6 +571,24 @@
         } catch (error) {
             showNotification('Ошибка соединения', 'error');
         }
+    }
+
+    function logout() {
+        const functionalAllowed = getCookie('cookie_functional') === 'true';
+
+        if (functionalAllowed) {
+            document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+        }
+
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('username');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('userRole');
+
+        showNotification('Вы вышли из системы', 'info');
+        setTimeout(function() {
+            window.location.href = '/';
+        }, 500);
     }
 
     function toggleSearchPanel() {

@@ -10,7 +10,10 @@
 
 <div class="search-panel" id="searchPanel">
     <div class="search-header" onclick="toggleSearchPanel()">
-        <h3><i class="fas fa-search"></i> Поиск исполнителей</h3>
+        <h3>
+            <i class="fas fa-search"></i>
+            <span>Поиск исполнителей</span>
+        </h3>
         <i class="fas fa-chevron-down" id="searchToggleIcon"></i>
     </div>
     <div class="panel-content">
@@ -592,7 +595,21 @@
     }
 
     function toggleSearchPanel() {
-        document.getElementById('searchPanel').classList.toggle('minimized');
+        const panel = document.getElementById('searchPanel');
+        const icon = document.getElementById('searchToggleIcon');
+        const span = document.querySelector('#searchPanel .search-header h3 span');
+
+        panel.classList.toggle('minimized');
+
+        if (panel.classList.contains('minimized')) {
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+            if (span) span.style.display = 'none';
+        } else {
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+            if (span) span.style.display = 'inline';
+        }
     }
 
     function toggleResultsPanel() {

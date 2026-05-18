@@ -4,36 +4,6 @@
 {% block title %}Elysium{% endblock %}
 
 {% block content %}
-<header class="header">
-    <div class="header-content">
-        <div class="logo" onclick="location.reload()">
-            <img src="{% static 'images/elysium.png' %}" alt="ElysiumFinder">
-            <span>Elysium</span>
-        </div>
-        <div class="nav-buttons" id="navButtons">
-            {% if user.is_authenticated %}
-                <a href="{% url 'profile' %}" class="btn btn-secondary">
-                    <i class="fas fa-user"></i>
-                    <span>{{ user.username }}</span>
-                </a>
-                <button class="btn btn-outline" onclick="logout()">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>Выйти</span>
-                </button>
-            {% else %}
-                <button class="btn btn-primary" onclick="showAuthModal()">
-                    <i class="fas fa-user"></i>
-                    <span>Войти</span>
-                </button>
-                <button class="btn btn-secondary" onclick="showRegisterModal()">
-                    <i class="fas fa-user-plus"></i>
-                    <span>Регистрация</span>
-                </button>
-            {% endif %}
-        </div>
-    </div>
-</header>
-
 <div class="map-wrapper">
     <div id="map"></div>
 </div>
@@ -61,6 +31,13 @@
                 <option value="it">💻 IT</option>
                 <option value="education">📚 Образование</option>
                 <option value="beauty">💅 Красота</option>
+            </select>
+        </div>
+
+        <div class="filter-group" id="searchSubcategoryGroup" style="display: none;">
+            <label><i class="fas fa-list"></i> Конкретная услуга</label>
+            <select id="searchSubcategory">
+                <option value="">Любая услуга</option>
             </select>
         </div>
 
@@ -160,6 +137,92 @@
 
 {% block extra_js %}
 <script>
+    const searchSubcategoriesData = {
+        'cleaning': [
+            'Комплексная уборка квартиры',
+            'Уборка после ремонта',
+            'Мытье окон',
+            'Химчистка мебели',
+            'Уборка офисов',
+            'Генеральная уборка',
+            'Поддерживающая уборка'
+        ],
+        'repair': [
+            'Поклейка обоев',
+            'Укладка ламината',
+            'Установка дверей',
+            'Монтаж натяжных потолков',
+            'Штукатурка стен',
+            'Сантехнические работы',
+            'Электромонтаж',
+            'Сборка мебели',
+            'Малярные работы'
+        ],
+        'delivery': [
+            'Доставка продуктов',
+            'Доставка готовой еды',
+            'Курьерская доставка',
+            'Грузоперевозки',
+            'Доставка лекарств',
+            'Доставка цветов'
+        ],
+        'construction': [
+            'Отделка квартир',
+            'Перепланировка',
+            'Фасадные работы',
+            'Кровельные работы',
+            'Фундаментные работы',
+            'Ландшафтный дизайн'
+        ],
+        'design': [
+            'Дизайн интерьера',
+            '3D визуализация',
+            'Ландшафтный дизайн',
+            'Веб-дизайн',
+            'Графический дизайн',
+            'Архитектурное проектирование'
+        ],
+        'photography': [
+            'Свадебная фотосъемка',
+            'Портретная фотосессия',
+            'Репортажная съемка',
+            'Предметная съемка',
+            'Аэрофотосъемка',
+            'Видеосъемка и монтаж'
+        ],
+        'it': [
+            'Разработка сайтов',
+            'Мобильные приложения',
+            'Настройка серверов',
+            'IT-консалтинг',
+            'Техническая поддержка',
+            'Разработка телеграм-ботов'
+        ],
+        'education': [
+            'Репетиторство онлайн',
+            'Курсы программирования',
+            'Изучение языков',
+            'Подготовка к экзаменам',
+            'Музыкальные занятия',
+            'Танцевальные мастер-классы'
+        ],
+        'beauty': [
+            'Парикмахерские услуги',
+            'Маникюр и педикюр',
+            'Косметология',
+            'Визаж и макияж',
+            'Массаж и СПА',
+            'Наращивание ресниц'
+        ],
+        'other': [
+            'Юридические консультации',
+            'Бухгалтерские услуги',
+            'Перевод текстов',
+            'Психологическая помощь',
+            'Фитнес тренировки',
+            'Выгул собак'
+        ]
+    };
     let map;
     let userPlacemark;
     let performerPlacemarks = [];
@@ -200,32 +263,22 @@
         }
 
         try {
-            showNotification('Выполняется вход...');
-
             const response = await fetch('/api/auth/login/', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                // Сохраняем в localStorage
                 localStorage.setItem('authToken', data.token);
                 localStorage.setItem('username', data.username);
                 localStorage.setItem('userId', data.user_id);
                 localStorage.setItem('userRole', data.role);
-
-                // Сохраняем в cookie для Django
                 document.cookie = `auth_token=${data.token}; path=/; max-age=86400`;
-
                 showNotification(`Добро пожаловать, ${data.username}!`, 'success');
                 closeModal();
-
-                // Перезагружаем страницу
                 window.location.href = '/';
             } else {
                 showNotification(data.error || 'Ошибка входа', 'error');
@@ -254,13 +307,9 @@
         }
 
         try {
-            showNotification('Выполняется регистрация...');
-
             const response = await fetch('/api/auth/register/', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password, email, phone, role })
             });
 
@@ -271,13 +320,9 @@
                 localStorage.setItem('username', data.username);
                 localStorage.setItem('userId', data.user_id);
                 localStorage.setItem('userRole', data.role);
-
-                // Сохраняем в cookie для Django
                 document.cookie = `auth_token=${data.token}; path=/; max-age=86400`;
-
                 showNotification('Регистрация успешна!', 'success');
                 closeModal();
-
                 window.location.href = '/';
             } else {
                 showNotification(data.error || 'Ошибка регистрации', 'error');
@@ -285,19 +330,6 @@
         } catch (error) {
             showNotification('Ошибка соединения', 'error');
         }
-    }
-
-    function logout() {
-        // Удаляем cookie
-        document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
-
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('username');
-        localStorage.removeItem('userId');
-        localStorage.removeItem('userRole');
-
-        showNotification('Вы вышли из системы', 'info');
-        window.location.href = '/';
     }
 
     function waitForYmaps() {
@@ -345,6 +377,29 @@
         searchPerformers();
     }
 
+    function loadSearchSubcategories() {
+        const category = document.getElementById('category').value;
+        const subcategoryGroup = document.getElementById('searchSubcategoryGroup');
+        const subcategorySelect = document.getElementById('searchSubcategory');
+
+        if (!category) {
+            subcategoryGroup.style.display = 'none';
+            return;
+        }
+
+        const subItems = searchSubcategoriesData[category] || [];
+
+        if (subItems.length > 0) {
+            subcategorySelect.innerHTML = '<option value="">Любая услуга</option>';
+            subItems.forEach(sub => {
+                subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+            });
+            subcategoryGroup.style.display = 'block';
+        } else {
+            subcategoryGroup.style.display = 'none';
+        }
+    }
+
     function updateRadiusCircle() {
         if (!currentLocation) return;
         const radius = document.getElementById('radius').value;
@@ -356,15 +411,22 @@
     }
 
     async function searchPerformers() {
-        if (!currentLocation) return;
+        if (!currentLocation) {
+            showNotification('Сначала определите местоположение', 'error');
+            return;
+        }
+
         const resultsList = document.getElementById('resultsList');
         resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Поиск...</p></div>';
         updateRadiusCircle();
 
         const radius = document.getElementById('radius').value;
         const category = document.getElementById('category').value;
+        const subcategory = document.getElementById('searchSubcategory').value;
+
         let url = `/api/search/find_performers/?lat=${currentLocation.lat}&lng=${currentLocation.lng}&radius=${radius}`;
         if (category) url += `&category=${category}`;
+        if (subcategory) url += `&service=${encodeURIComponent(subcategory)}`;
 
         try {
             const response = await fetch(url);
@@ -372,6 +434,7 @@
             displayPerformers(data.results || []);
             addMarkersToMap(data.results || []);
         } catch (error) {
+            console.error('Ошибка поиска:', error);
             resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Ошибка загрузки</p></div>';
         }
     }
@@ -379,28 +442,48 @@
     function displayPerformers(performers) {
         const resultsList = document.getElementById('resultsList');
         document.getElementById('resultsCount').textContent = performers.length;
+
         if (performers.length === 0) {
             resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-frown"></i><p>Исполнителей не найдено</p></div>';
             return;
         }
+
         const categoryMap = {
             'cleaning': '🧹 Уборка', 'repair': '🔧 Ремонт', 'delivery': '🚚 Доставка',
             'construction': '🏗️ Строительство', 'design': '🎨 Дизайн', 'photography': '📸 Фотография',
             'it': '💻 IT', 'education': '📚 Образование', 'beauty': '💅 Красота'
         };
+
         resultsList.innerHTML = performers.map(p => `
             <div class="performer-card" onclick="showPerformerDetails(${JSON.stringify(p).replace(/"/g, '&quot;')})">
                 <div class="card-header">
-                    <div class="performer-name"><i class="fas fa-user-circle"></i> ${p.username || 'Исполнитель'}</div>
-                    <div class="rating">${'★'.repeat(Math.floor(p.rating))}${'☆'.repeat(5 - Math.floor(p.rating))}<span>${p.rating}</span></div>
+                    <div class="performer-name">
+                        <i class="fas fa-user-circle"></i> ${p.username || 'Исполнитель'}
+                        ${p.rating >= 4.5 ? '<span class="pro-badge">PRO</span>' : ''}
+                    </div>
+                    <div class="rating">
+                        ${'★'.repeat(Math.floor(p.rating))}${'☆'.repeat(5 - Math.floor(p.rating))}
+                        <span>${p.rating}</span>
+                    </div>
                 </div>
                 <div class="card-details">
                     <span class="category-badge"><i class="fas fa-tag"></i> ${categoryMap[p.category] || p.category || 'Разное'}</span>
                     <span class="price"><i class="fas fa-ruble-sign"></i> ${p.price || 'Договорная'}/час</span>
                     <span><i class="fas fa-location-dot"></i> ${p.distance_km} км</span>
                 </div>
+                ${p.services_list && p.services_list.length > 0 ? `
+                <div class="services-list">
+                    <i class="fas fa-list-check"></i>
+                    ${p.services_list.slice(0, 3).map(s => `<span class="service-tag">${s.length > 25 ? s.substring(0, 25) + '...' : s}</span>`).join('')}
+                    ${p.services_list.length > 3 ? `<span class="service-tag">+${p.services_list.length - 3}</span>` : ''}
+                </div>
+                ` : ''}
+                <div class="order-count">
+                    <i class="fas fa-check-circle"></i> ${p.completed_orders || 0} заказов выполнено
+                </div>
             </div>
         `).join('');
+
         document.getElementById('resultsPanel').classList.remove('minimized');
     }
 
@@ -455,7 +538,10 @@
         try {
             const response = await fetch('/api/orders/', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Token ${token}`
+                },
                 body: JSON.stringify({
                     title, description, budget,
                     category: document.getElementById('category').value || 'other',
@@ -494,6 +580,23 @@
             map.geoObjects.add(window.radiusCircle);
         }
     });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const categorySelect = document.getElementById('category');
+        if (categorySelect) {
+            categorySelect.addEventListener('change', function() {
+                loadSearchSubcategories();
+                searchPerformers();
+            });
+        }
+
+        const subcategorySelect = document.getElementById('searchSubcategory');
+        if (subcategorySelect) {
+            subcategorySelect.addEventListener('change', searchPerformers);
+        }
+
+        loadSearchSubcategories();
+});
 
     window.onload = initMap;
 </script>

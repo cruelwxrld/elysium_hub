@@ -136,6 +136,7 @@
             align-items: center;
             gap: 10px;
             cursor: pointer;
+            text-decoration: none;
         }
 
         .logo img {
@@ -252,13 +253,27 @@
         }
 
         .filter-group select,
-        .filter-group input {
+        .filter-group input,
+        .filter-group textarea {
             width: 100%;
             padding: 12px;
             border: 1px solid #e5e7eb;
             border-radius: 12px;
             font-size: 14px;
             font-family: 'Inter', sans-serif;
+        }
+
+        .filter-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .filter-group select:focus,
+        .filter-group input:focus,
+        .filter-group textarea:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
         .radius-value {
@@ -441,6 +456,40 @@
             padding: 24px;
         }
 
+        .pro-badge {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 12px;
+            margin-left: 5px;
+        }
+
+        .services-list {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .service-tag {
+            background: #e0e7ff;
+            color: #4f46e5;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .order-count {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #10b981;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
         @media (max-width: 768px) {
             .search-panel {
                 max-width: calc(100% - 40px);
@@ -461,6 +510,7 @@
     </style>
 </head>
 <body>
+    {% if request.path == '/' %}
     <div class="splash-screen" id="splashScreen">
         <div class="splash-content">
             <div class="splash-logo">
@@ -473,17 +523,17 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <div id="notification" class="notification"></div>
     <div id="modalOverlay" class="modal-overlay"></div>
 
-    <!-- NAVIGATION HEADER -->
     <header class="header">
         <div class="header-content">
-            <div class="logo" onclick="location.reload()">
+            <a href="/" class="logo">
                 <img src="{% static 'images/elysium.png' %}" alt="ElysiumFinder">
                 <span>Elysium</span>
-            </div>
+            </a>
             <div class="nav-buttons" id="navButtons">
                 {% if user.is_authenticated %}
                     <a href="{% url 'profile' %}" class="btn btn-secondary">
@@ -513,15 +563,19 @@
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 
     <script>
+        {% if request.path == '/' %}
         window.addEventListener('load', function() {
-            setTimeout(function() {
-                const splash = document.getElementById('splashScreen');
-                splash.classList.add('hide');
+            const splash = document.getElementById('splashScreen');
+            if (splash) {
                 setTimeout(function() {
-                    splash.style.display = 'none';
-                }, 500);
-            }, 2000);
+                    splash.classList.add('hide');
+                    setTimeout(function() {
+                        splash.style.display = 'none';
+                    }, 500);
+                }, 2000);
+            }
         });
+        {% endif %}
 
         function showNotification(message, type) {
             const notification = document.getElementById('notification');

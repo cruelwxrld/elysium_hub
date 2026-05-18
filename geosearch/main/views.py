@@ -198,11 +198,12 @@ class SearchViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'])
     def find_performers(self, request):
-        """Поиск исполнителей по геолокации и радиусу"""
+        """Поиск исполнителей по геолокации и услугам"""
         lat = request.query_params.get('lat')
         lng = request.query_params.get('lng')
         radius = float(request.query_params.get('radius', 10))
         category = request.query_params.get('category', '')
+        service = request.query_params.get('service', '')  # Конкретная услуга
 
         lat = float(lat)
         lng = float(lng)
@@ -217,8 +218,10 @@ class SearchViewSet(viewsets.ViewSet):
         if category:
             performers = performers.filter(category=category)
 
-        results = []
+        if service:
+            performers = performers.filter(services__icontains=service)
 
+        results = []
         for performer in performers:
             distance = self.calculate_distance(
                 lat, lng,
@@ -228,7 +231,10 @@ class SearchViewSet(viewsets.ViewSet):
             if distance <= radius:
                 performer_data = ProfileSerializer(performer).data
                 performer_data['distance_km'] = round(distance, 2)
+                performer_data['services_list'] = performer.get_services_list() if hasattr(performer,
+                                                                                           'get_services_list') else []
                 results.append(performer_data)
+
         results.sort(key=lambda x: x['distance_km'])
 
         return Response({
@@ -239,6 +245,7 @@ class SearchViewSet(viewsets.ViewSet):
                 'longitude': lng,
                 'radius': radius,
                 'category': category,
+                'service': service,
             }
         })
 
@@ -317,6 +324,61 @@ class SearchViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=500)
 
+    @action(detail=False, methods=['get'])
+    def get_subcategories(self, request):
+        """Получение подкатегорий для выбранной категории"""
+        category_slug = request.query_params.get('category')
+
+        if not category_slug:
+            return Response({'error': 'Категория не указана'}, status=400)
+
+        try:
+            from .models import ServiceCategory, Subcategory
+
+            category_map = {
+                'cleaning': 'cleaning',
+                'repair': 'repair',
+                'delivery': 'delivery',
+                'construction': 'construction',
+                'design': 'design',
+                'photography': 'photography',
+                'it': 'it',
+                'education': 'education',
+                'beauty': 'beauty',
+            }
+
+            category_name = category_map.get(category_slug, category_slug)
+
+            category = ServiceCategory.objects.filter(slug=category_slug).first()
+
+            if not category:
+                default_subcategories = {
+                    'cleaning': ['Комплексная уборка', 'Уборка после ремонта', 'Мытье окон', 'Химчистка мебели'],
+                    'repair': ['Поклейка обоев', 'Укладка ламината', 'Установка дверей', 'Монтаж потолков',
+                               'Сантехника', 'Электрика'],
+                    'delivery': ['Доставка продуктов', 'Доставка еды', 'Курьерская доставка', 'Грузоперевозки'],
+                    'construction': ['Отделка квартир', 'Перепланировка', 'Фасадные работы', 'Кровля'],
+                    'design': ['Дизайн интерьера', '3D визуализация', 'Ландшафтный дизайн', 'Веб-дизайн'],
+                    'photography': ['Свадебная съемка', 'Портретная съемка', 'Репортаж', 'Предметная съемка'],
+                    'it': ['Разработка сайтов', 'Мобильные приложения', 'Настройка серверов', 'IT-консалтинг'],
+                    'education': ['Репетиторство', 'Курсы', 'Языки', 'Подготовка к экзаменам'],
+                    'beauty': ['Парикмахер', 'Маникюр', 'Косметология', 'Визаж', 'Массаж'],
+                }
+
+                sub_names = default_subcategories.get(category_slug, [])
+                subcategories = [{'id': i, 'name': name, 'description': ''} for i, name in enumerate(sub_names)]
+            else:
+                subcategories = list(category.subcategories.values('id', 'name', 'description', 'estimated_time'))
+
+            return Response({
+                'success': True,
+                'category': category_slug,
+                'subcategories': subcategories
+            })
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
 
 def home(request):
     """Главная страница"""
@@ -382,27 +444,33 @@ def edit_profile_view(request):
 
         if profile.role == 'performer':
             profile.category = request.POST.get('category', profile.category)
-            profile.price = request.POST.get('price', profile.price)
+            price_value = request.POST.get('price', '')
+            profile.price = float(price_value) if price_value and price_value.strip() else None
+
             profile.description = request.POST.get('description', profile.description)
             profile.is_available = request.POST.get('is_available') == 'on'
+            services = request.POST.get('services', '')
+            profile.services = services
 
         profile.save()
         messages.success(request, 'Профиль успешно обновлен')
         return redirect('profile')
 
+    categories = [
+        ('cleaning', '🧹 Уборка'),
+        ('repair', '🔧 Ремонт'),
+        ('delivery', '🚚 Доставка'),
+        ('construction', '🏗️ Строительство'),
+        ('design', '🎨 Дизайн'),
+        ('photography', '📸 Фотография'),
+        ('it', '💻 IT'),
+        ('education', '📚 Образование'),
+        ('beauty', '💅 Красота'),
+    ]
+
     context = {
         'profile': profile,
-        'categories': [
-            ('cleaning', '🧹 Уборка'),
-            ('repair', '🔧 Ремонт'),
-            ('delivery', '🚚 Доставка'),
-            ('construction', '🏗️ Строительство'),
-            ('design', '🎨 Дизайн'),
-            ('photography', '📸 Фотография'),
-            ('it', '💻 IT'),
-            ('education', '📚 Образование'),
-            ('beauty', '💅 Красота'),
-        ],
+        'categories': categories,
     }
     return render(request, 'edit_profile.html', context)
 
@@ -415,24 +483,28 @@ def become_performer_view(request):
     if request.method == 'POST':
         profile.role = 'performer'
         profile.category = request.POST.get('category')
-        profile.price = request.POST.get('price')
-        profile.description = request.POST.get('description')
+        price_value = request.POST.get('price', '')
+        profile.price = float(price_value) if price_value and price_value.strip() else None
+
+        profile.description = request.POST.get('description', '')
         profile.is_available = True
         profile.save()
         messages.success(request, 'Поздравляем! Теперь вы исполнитель')
         return redirect('profile')
 
+    categories = [
+        ('cleaning', '🧹 Уборка'),
+        ('repair', '🔧 Ремонт'),
+        ('delivery', '🚚 Доставка'),
+        ('construction', '🏗️ Строительство'),
+        ('design', '🎨 Дизайн'),
+        ('photography', '📸 Фотография'),
+        ('it', '💻 IT'),
+        ('education', '📚 Образование'),
+        ('beauty', '💅 Красота'),
+    ]
+
     context = {
-        'categories': [
-            ('cleaning', '🧹 Уборка'),
-            ('repair', '🔧 Ремонт'),
-            ('delivery', '🚚 Доставка'),
-            ('construction', '🏗️ Строительство'),
-            ('design', '🎨 Дизайн'),
-            ('photography', '📸 Фотография'),
-            ('it', '💻 IT'),
-            ('education', '📚 Образование'),
-            ('beauty', '💅 Красота'),
-        ],
+        'categories': categories,
     }
     return render(request, 'become_performer.html', context)

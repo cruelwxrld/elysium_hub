@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+
 class Profile(models.Model):
     """Профиль пользователя"""
     ROLE_CHOICES = [
@@ -26,20 +27,19 @@ class Profile(models.Model):
     completed_orders = models.IntegerField(default=0)
     is_available = models.BooleanField(default=True)
 
+    services = models.TextField(blank=True, help_text="Услуги, которые предоставляет исполнитель (через запятую)")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.user.username
 
-    def update_rating(self):
-        """Обновление рейтинга"""
-        from .models import Review
-        reviews = Review.objects.filter(performer=self.user)
-        if reviews.exists():
-            avg = reviews.aggregate(models.Avg('rating'))['rating__avg']
-            self.rating = round(avg, 1)
-            self.save()
+    def get_services_list(self):
+        """Возвращает список услуг исполнителя"""
+        if self.services:
+            return [s.strip() for s in self.services.split(',')]
+        return []
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
@@ -53,6 +53,7 @@ def save_user_profile(sender, instance, **kwargs):
     """Сохраняет профиль при сохранении пользователя"""
     instance.profile.save()
 
+
 class Order(models.Model):
     """Заказ услуги"""
     STATUS_CHOICES = [
@@ -63,12 +64,15 @@ class Order(models.Model):
         ('cancelled', 'Отменен'),
     ]
 
-    client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='client')
-    performer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='performer')
+    client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders_as_client')
+    performer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='orders_as_performer')
 
     title = models.CharField(max_length=200)
     description = models.TextField()
     category = models.CharField(max_length=50)
+    subcategory = models.CharField(max_length=200, blank=True, null=True)  # Добавьте это поле
+    subcategory_details = models.TextField(blank=True, null=True)  # Дополнительные детали
 
     latitude = models.FloatField()
     longitude = models.FloatField()
@@ -96,3 +100,38 @@ class Review(models.Model):
         super().save(*args, **kwargs)
         if hasattr(self.performer, 'profile'):
             self.performer.profile.update_rating()
+
+
+class ServiceCategory(models.Model):
+    """Основная категория услуг"""
+    name = models.CharField(max_length=100)
+    icon = models.CharField(max_length=50, blank=True)
+    slug = models.SlugField(unique=True)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'Категория услуг'
+        verbose_name_plural = 'Категории услуг'
+        ordering = ['order']
+
+    def __str__(self):
+        return self.name
+
+
+class Subcategory(models.Model):
+    """Подкатегория услуг (детализация)"""
+    category = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, related_name='subcategories')
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    price_modifier = models.DecimalField(max_digits=5, decimal_places=2, default=1.0, help_text="Множитель цены")
+    estimated_time = models.IntegerField(default=60, help_text="Примерное время выполнения в минутах")
+    is_popular = models.BooleanField(default=False)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'Подкатегория'
+        verbose_name_plural = 'Подкатегории'
+        ordering = ['category', 'order']
+
+    def __str__(self):
+        return f"{self.category.name} - {self.name}"

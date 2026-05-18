@@ -13,9 +13,13 @@ urlpatterns = [
     path('api/', include(router.urls)),
     path('api-token-auth/', obtain_auth_token, name='api_token_auth'),
 
+    path('api/subcategories/', views.SearchViewSet.as_view({'get': 'get_subcategories'}), name='subcategories'),
+
     path('profile/', views.profile_view, name='profile'),
     path('profile/edit/', views.edit_profile_view, name='edit_profile'),
     path('become-performer/', views.become_performer_view, name='become_performer'),
 
     path('', views.home, name='home'),
+
+    path('api/categories/<slug:category_slug>/subcategories/', views.SearchViewSet.as_view({'get': 'get_subcategories'}), name='subcategories'),
 ]

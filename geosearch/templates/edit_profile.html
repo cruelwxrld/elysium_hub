@@ -28,13 +28,22 @@
 
             {% if profile.role == 'performer' %}
             <div class="form-group">
-                <label>Категория услуг</label>
-                <select name="category">
+                <label>Основная категория услуг</label>
+                <select name="category" id="performerCategory">
                     <option value="">Выберите категорию</option>
                     {% for value, label in categories %}
                     <option value="{{ value }}" {% if profile.category == value %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
+            </div>
+
+            <div class="form-group" id="servicesGroup">
+                <label>Какие услуги вы предоставляете?</label>
+                <div class="services-checkboxes" id="servicesCheckboxes">
+                    <!-- Сюда динамически загрузятся подкатегории -->
+                </div>
+                <input type="hidden" name="services" id="servicesInput" value="{{ profile.services|default:'' }}">
+                <small class="form-hint">Выберите конкретные услуги, которые вы готовы выполнять</small>
             </div>
 
             <div class="form-group">
@@ -93,11 +102,107 @@
         font-family: 'Inter', sans-serif;
     }
 
-    .form-group input:focus,
-    .form-group select:focus,
-    .form-group textarea:focus {
-        outline: none;
-        border-color: #6366f1;
+    .services-checkboxes {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+        max-height: 300px;
+        overflow-y: auto;
+        padding: 10px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #f9fafb;
+    }
+
+    .service-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        background: white;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .service-checkbox:hover {
+        background: #f3f4f6;
+    }
+
+    .service-checkbox input {
+        width: auto;
+        margin: 0;
+    }
+
+    .form-hint {
+        display: block;
+        font-size: 12px;
+        color: #6b7280;
+        margin-top: 5px;
     }
 </style>
+
+<script>
+    const subcategoriesData = {
+        'cleaning': ['Комплексная уборка квартиры', 'Уборка после ремонта', 'Мытье окон', 'Химчистка мебели', 'Уборка офисов', 'Генеральная уборка'],
+        'repair': ['Поклейка обоев', 'Укладка ламината', 'Установка дверей', 'Монтаж натяжных потолков', 'Штукатурка стен', 'Сантехнические работы', 'Электромонтаж', 'Сборка мебели', 'Малярные работы'],
+        'delivery': ['Доставка продуктов', 'Доставка еды', 'Курьерская доставка', 'Грузоперевозки', 'Доставка лекарств'],
+        'construction': ['Отделка квартир', 'Перепланировка', 'Фасадные работы', 'Кровля', 'Фундамент'],
+        'design': ['Дизайн интерьера', '3D визуализация', 'Ландшафтный дизайн', 'Веб-дизайн', 'Графический дизайн'],
+        'photography': ['Свадебная съемка', 'Портретная съемка', 'Репортаж', 'Предметная съемка', 'Аэрофотосъемка'],
+        'it': ['Разработка сайтов', 'Мобильные приложения', 'Настройка серверов', 'IT-консалтинг', 'Техподдержка'],
+        'education': ['Репетиторство', 'Курсы программирования', 'Изучение языков', 'Подготовка к экзаменам', 'Музыка'],
+        'beauty': ['Парикмахер', 'Маникюр', 'Косметология', 'Визаж', 'Массаж', 'Наращивание ресниц'],
+        'other': ['Юридические услуги', 'Бухгалтерия', 'Переводы', 'Психология', 'Фитнес']
+    };
+
+    function loadServicesCheckboxes() {
+        const category = document.getElementById('performerCategory').value;
+        const servicesGroup = document.getElementById('servicesGroup');
+        const servicesCheckboxes = document.getElementById('servicesCheckboxes');
+        const savedServices = document.getElementById('servicesInput').value;
+        const savedServicesList = savedServices ? savedServices.split(',').map(s => s.trim()) : [];
+
+        if (!category) {
+            servicesGroup.style.display = 'none';
+            return;
+        }
+
+        servicesGroup.style.display = 'block';
+        const services = subcategoriesData[category] || [];
+
+        if (services.length === 0) {
+            servicesCheckboxes.innerHTML = '<p style="color: #6b7280;">Нет доступных услуг для этой категории</p>';
+            return;
+        }
+
+        servicesCheckboxes.innerHTML = services.map(service => `
+            <label class="service-checkbox">
+                <input type="checkbox" value="${service}" ${savedServicesList.includes(service) ? 'checked' : ''}>
+                <span>${service}</span>
+            </label>
+        `).join('');
+
+        const checkboxes = servicesCheckboxes.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', updateServicesInput);
+        });
+        updateServicesInput();
+    }
+
+    function updateServicesInput() {
+        const servicesCheckboxes = document.getElementById('servicesCheckboxes');
+        const selected = Array.from(servicesCheckboxes.querySelectorAll('input[type="checkbox"]:checked'))
+            .map(cb => cb.value);
+        document.getElementById('servicesInput').value = selected.join(',');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const categorySelect = document.getElementById('performerCategory');
+        if (categorySelect) {
+            categorySelect.addEventListener('change', loadServicesCheckboxes);
+            loadServicesCheckboxes();
+        }
+    });
+</script>
 {% endblock %}

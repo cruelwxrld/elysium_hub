@@ -264,13 +264,6 @@
         const username = document.getElementById('loginUsername').value;
         const password = document.getElementById('loginPassword').value;
 
-        const functionalAllowed = getCookie('cookie_functional') === 'true';
-
-        if (!functionalAllowed && getCookie('cookie_consent') === 'custom') {
-            showNotification('Функциональные cookies отключены. Вход невозможен.', 'error');
-            return;
-        }
-
         if (!username || !password) {
             showNotification('Заполните все поля', 'error');
             return;
@@ -279,25 +272,35 @@
         try {
             const response = await fetch('/api/auth/login/', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify({ username, password })
             });
 
             const data = await response.json();
+            console.log('Ответ сервера:', data);
 
             if (response.ok) {
                 localStorage.setItem('authToken', data.token);
                 localStorage.setItem('username', data.username);
                 localStorage.setItem('userId', data.user_id);
                 localStorage.setItem('userRole', data.role);
+
                 document.cookie = `auth_token=${data.token}; path=/; max-age=86400`;
+
+                console.log('Токен сохранен:', data.token);
                 showNotification(`Добро пожаловать, ${data.username}!`, 'success');
                 closeModal();
-                window.location.href = '/';
+
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 500);
             } else {
                 showNotification(data.error || 'Ошибка входа', 'error');
             }
         } catch (error) {
+            console.error('Ошибка:', error);
             showNotification('Ошибка соединения', 'error');
         }
     }

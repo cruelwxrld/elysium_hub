@@ -8,7 +8,7 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from math import radians, sin, cos, sqrt, atan2
-from .models import Profile, Order, Review
+from .models import Profile, Order, Review, ServiceCategory, Subcategory
 from .serializers import *
 import requests
 from django.contrib.auth.decorators import login_required
@@ -37,14 +37,13 @@ class AuthViewSet(viewsets.ViewSet):
         try:
             user = User.objects.create_user(username=username, password=password, email=email)
 
-            Profile.objects.create(
-                user=user,
-                phone=phone,
-                role=role,
-                is_available=True,
-                rating=0,
-                completed_orders=0
-            )
+            profile = user.profile
+            profile.phone = phone
+            profile.role = role
+            profile.is_available = True
+            profile.rating = 0
+            profile.completed_orders = 0
+            profile.save()
 
             token, _ = Token.objects.get_or_create(user=user)
 

@@ -458,7 +458,9 @@
 
     function displayPerformers(performers) {
         const resultsList = document.getElementById('resultsList');
-        document.getElementById('resultsCount').textContent = performers.length;
+        const resultsCount = document.getElementById('resultsCount');
+
+        resultsCount.textContent = performers.length;
 
         if (performers.length === 0) {
             resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-frown"></i><p>Исполнителей не найдено</p></div>';
@@ -521,17 +523,45 @@
 
     function showPerformerDetails(performer) {
         const modal = document.getElementById('modalOverlay');
+        const categoryMap = {
+            'cleaning': 'Уборка', 'repair': 'Ремонт', 'delivery': 'Доставка',
+            'construction': 'Строительство', 'design': 'Дизайн', 'photography': 'Фотография',
+            'it': 'IT', 'education': 'Образование', 'beauty': 'Красота'
+        };
+
         modal.innerHTML = `
             <div class="modal-content">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2>${performer.username}</h2>
-                    <button onclick="closeModal()" style="background: none; border: none; font-size: 28px; cursor: pointer;">&times;</button>
+                    <h2><i class="fas fa-user-circle"></i> ${performer.username}</h2>
+                    <button onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
                 </div>
-                <p>⭐ Рейтинг: ${performer.rating}</p>
-                <p>💰 Цена: ${performer.price || 'Договорная'} ₽/час</p>
-                <p>📝 ${performer.description || 'Нет описания'}</p>
-                <button class="btn btn-primary" style="margin-top: 20px; width:100%" onclick="createOrder(${performer.id})">Заказать</button>
-                <button class="btn btn-secondary" style="margin-top: 10px; width:100%" onclick="closeModal()">Закрыть</button>
+                <div style="margin-bottom: 16px;">
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                        <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;"><i class="fas fa-star"></i> ${performer.rating || 0}</span>
+                        <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;"><i class="fas fa-phone"></i> ${performer.phone || 'Не указан'}</span>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong><i class="fas fa-tag"></i> Категория:</strong> ${categoryMap[performer.category] || performer.category || 'Разное'}
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong><i class="fas fa-ruble-sign"></i> Цена:</strong> ${performer.price || 'Договорная'} ₽/час
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong><i class="fas fa-check-circle"></i> Заказов выполнено:</strong> ${performer.completed_orders || 0}
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <strong><i class="fas fa-info-circle"></i> О себе:</strong><br>
+                        ${performer.description || 'Информация не указана'}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <a href="{% url 'create_order' %}?performer_id=${performer.id}" class="btn btn-primary" style="flex: 1; text-align: center; text-decoration: none;">
+                        <i class="fas fa-shopping-cart"></i> Заказать услугу
+                    </a>
+                    <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal()">
+                        <i class="fas fa-times"></i> Закрыть
+                    </button>
+                </div>
             </div>
         `;
         modal.style.display = 'flex';

@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -8,7 +9,7 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from math import radians, sin, cos, sqrt, atan2
-from .models import Profile, Order, Review, ServiceCategory, Subcategory
+from .models import Profile, Order, Review
 from .serializers import *
 import requests
 from django.contrib.auth.decorators import login_required
@@ -37,13 +38,14 @@ class AuthViewSet(viewsets.ViewSet):
         try:
             user = User.objects.create_user(username=username, password=password, email=email)
 
-            profile = user.profile
-            profile.phone = phone
-            profile.role = role
-            profile.is_available = True
-            profile.rating = 0
-            profile.completed_orders = 0
-            profile.save()
+            Profile.objects.create(
+                user=user,
+                phone=phone,
+                role=role,
+                is_available=True,
+                rating=0,
+                completed_orders=0
+            )
 
             token, _ = Token.objects.get_or_create(user=user)
 
@@ -177,6 +179,108 @@ class OrderViewSet(viewsets.ModelViewSet):
         """Создание заказа с текущим пользователем как клиентом"""
         serializer.save(client=self.request.user)
 
+    @login_required
+    def create_order_view(request):
+        """Страница создания заказа"""
+        performers = Profile.objects.filter(
+            role='performer',
+            is_available=True
+        ).select_related('user')
+
+        if request.method == 'POST':
+            title = request.POST.get('title')
+            description = request.POST.get('description')
+            category = request.POST.get('category')
+            subcategory = request.POST.get('subcategory')
+            budget = request.POST.get('budget')
+            deadline = request.POST.get('deadline')
+            address = request.POST.get('address')
+            latitude = request.POST.get('latitude')
+            longitude = request.POST.get('longitude')
+            performer_id = request.POST.get('performer_id')
+
+            if not all([title, description, category, budget]):
+                messages.error(request, 'Заполните все обязательные поля')
+                return redirect('create_order')
+
+            full_description = description
+            if subcategory:
+                full_description = f"Услуга: {subcategory}\n\n{description}"
+
+            order = Order.objects.create(
+                client=request.user,
+                title=title,
+                description=full_description,
+                category=category,
+                budget=budget,
+                address=address or 'По согласованию',
+                latitude=float(latitude) if latitude else request.user.profile.latitude or 55.751244,
+                longitude=float(longitude) if longitude else request.user.profile.longitude or 37.618423,
+                status='pending'
+            )
+
+            if performer_id:
+                try:
+                    performer = User.objects.get(id=performer_id)
+                    order.performer = performer
+                    order.status = 'accepted'
+                    order.save()
+                    messages.success(request, f'Заказ "{title}" отправлен исполнителю!')
+                except User.DoesNotExist:
+                    messages.warning(request, 'Заказ создан, но исполнитель не найден')
+            else:
+                messages.success(request, f'Заказ "{title}" успешно создан! Ожидайте отклика исполнителей')
+
+            return redirect('my_orders')
+
+        categories = [
+            ('cleaning', '🧹 Уборка'),
+            ('repair', '🔧 Ремонт'),
+            ('delivery', '🚚 Доставка'),
+            ('construction', '🏗️ Строительство'),
+            ('design', '🎨 Дизайн'),
+            ('photography', '📸 Фотография'),
+            ('it', '💻 IT'),
+            ('education', '📚 Образование'),
+            ('beauty', '💅 Красота'),
+        ]
+
+        subcategories_data = {
+            'cleaning': ['Комплексная уборка', 'Уборка после ремонта', 'Мытье окон', 'Химчистка мебели',
+                         'Уборка офисов'],
+            'repair': ['Поклейка обоев', 'Укладка ламината', 'Установка дверей', 'Монтаж потолков', 'Сантехника',
+                       'Электрика', 'Сборка мебели'],
+            'delivery': ['Доставка продуктов', 'Доставка еды', 'Курьерская доставка', 'Грузоперевозки'],
+            'construction': ['Отделка квартир', 'Перепланировка', 'Фасадные работы', 'Кровля'],
+            'design': ['Дизайн интерьера', '3D визуализация', 'Ландшафтный дизайн', 'Веб-дизайн'],
+            'photography': ['Свадебная съемка', 'Портретная съемка', 'Репортаж', 'Предметная съемка'],
+            'it': ['Разработка сайтов', 'Мобильные приложения', 'Настройка серверов', 'IT-консалтинг'],
+            'education': ['Репетиторство', 'Курсы', 'Изучение языков', 'Подготовка к экзаменам'],
+            'beauty': ['Парикмахер', 'Маникюр', 'Косметология', 'Визаж', 'Массаж'],
+        }
+
+        context = {
+            'performers': performers,
+            'categories': categories,
+            'subcategories_data': subcategories_data,
+            'selected_performer_id': request.GET.get('performer_id'),
+            'user_location': request.user.profile,
+        }
+        return render(request, 'create_order.html', context)
+
+    @login_required
+    def my_orders_view(request):
+        """Страница моих заказов"""
+        orders_as_client = Order.objects.filter(client=request.user).order_by('-created_at')
+        orders_as_performer = Order.objects.filter(performer=request.user).order_by(
+            '-created_at') if request.user.profile.role == 'performer' else []
+
+        context = {
+            'client_orders': orders_as_client,
+            'performer_orders': orders_as_performer,
+        }
+        return render(request, 'my_orders.html', context)
+
 
 class SearchViewSet(viewsets.ViewSet):
     """Поиск исполнителей"""
@@ -194,6 +298,41 @@ class SearchViewSet(viewsets.ViewSet):
         c = 2 * atan2(sqrt(a), sqrt(1-a))
 
         return R * c
+
+    @action(detail=False, methods=['get'], url_path='performer/(?P<performer_id>[^/.]+)')
+    def get_performer_profile(self, request, performer_id=None):
+        """Получение профиля исполнителя по ID"""
+        if not performer_id:
+            return Response({'error': 'performer_id обязателен'}, status=400)
+
+        try:
+            from django.contrib.auth.models import User
+            user = User.objects.get(id=performer_id)
+            profile = user.profile
+
+            if profile.role != 'performer':
+                return JsonResponse({'error': 'Пользователь не является исполнителем'}, status=400)
+
+            services_list = []
+            if profile.services:
+                services_list = [s.strip() for s in profile.services.split(',') if s.strip()]
+
+            # Получаем название категории для отображения
+            category_display = profile.category
+
+            return JsonResponse({
+                'id': user.id,
+                'username': user.username,
+                'category': category_display,
+                'price': float(profile.price) if profile.price else None,
+                'services': services_list,
+                'description': profile.description,
+                'rating': profile.rating,
+                'phone': profile.phone,
+                'completed_orders': profile.completed_orders
+            })
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'Исполнитель не найден'}, status=404)
 
     @action(detail=False, methods=['get'])
     def find_performers(self, request):

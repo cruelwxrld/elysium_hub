@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Мои заказы - Elysium{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; margin: 100px auto 40px; padding: 0 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <h1><i class="fas fa-list-alt"></i> Мои заказы</h1>
+        <a href="{% url 'create_order' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Создать заказ
+        </a>
+    </div>
+
+    <div class="card">
+        <h2><i class="fas fa-user"></i> Как заказчик</h2>
+        {% if client_orders %}
+            {% for order in client_orders %}
+            <div class="order-item">
+                <div class="order-header">
+                    <div>
+                        <strong>{{ order.title }}</strong>
+                        <span class="order-status status-{{ order.status }}">{{ order.get_status_display }}</span>
+                    </div>
+                    <div class="order-budget">{{ order.budget }} ₽</div>
+                </div>
+                <div class="order-details">
+                    <div><i class="fas fa-tag"></i> {{ order.category }}</div>
+                    <div><i class="fas fa-user"></i> Исполнитель: {{ order.performer.username|default:"Не назначен" }}</div>
+                    <div><i class="fas fa-calendar"></i> Создан: {{ order.created_at|date:"d.m.Y H:i" }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="empty-state">У вас пока нет заказов. <a href="{% url 'create_order' %}">Создать заказ</a></p>
+        {% endif %}
+    </div>
+
+    {% if user.profile.role == 'performer' %}
+    <div class="card" style="margin-top: 30px;">
+        <h2><i class="fas fa-briefcase"></i> Как исполнитель</h2>
+        {% if performer_orders %}
+            {% for order in performer_orders %}
+            <div class="order-item">
+                <div class="order-header">
+                    <div>
+                        <strong>{{ order.title }}</strong>
+                        <span class="order-status status-{{ order.status }}">{{ order.get_status_display }}</span>
+                    </div>
+                    <div class="order-budget">{{ order.budget }} ₽</div>
+                </div>
+                <div class="order-details">
+                    <div><i class="fas fa-tag"></i> {{ order.category }}</div>
+                    <div><i class="fas fa-user"></i> Заказчик: {{ order.client.username }}</div>
+                    <div><i class="fas fa-calendar"></i> Создан: {{ order.created_at|date:"d.m.Y H:i" }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="empty-state">У вас пока нет заказов как у исполнителя</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .card {
+        background: white;
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .order-item {
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 12px;
+        transition: all 0.3s;
+    }
+
+    .order-item:hover {
+        border-color: #6366f1;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+    }
+
+    .order-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .order-budget {
+        font-size: 18px;
+        font-weight: 700;
+        color: #10b981;
+    }
+
+    .order-details {
+        display: flex;
+        gap: 20px;
+        font-size: 13px;
+        color: #6b7280;
+        flex-wrap: wrap;
+    }
+
+    .order-status {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-left: 10px;
+    }
+
+    .status-pending { background: #fef3c7; color: #d97706; }
+    .status-accepted { background: #dbeafe; color: #2563eb; }
+    .status-in_progress { background: #e0e7ff; color: #4f46e5; }
+    .status-completed { background: #d1fae5; color: #059669; }
+    .status-cancelled { background: #fee2e2; color: #dc2626; }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #6b7280;
+    }
+
+    @media (max-width: 768px) {
+        .order-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+    }
+</style>
+{% endblock %}

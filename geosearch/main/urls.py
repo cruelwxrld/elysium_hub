@@ -22,7 +22,12 @@ urlpatterns = [
 
     path('', views.home, name='home'),
 
+    path('create-order/', views.OrderViewSet.create_order_view, name='create_order'),
+    path('my-orders/', views.OrderViewSet.my_orders_view, name='my_orders'),
+
     path('privacy/', TemplateView.as_view(template_name='privacy.html'), name='privacy'),
+
+    path('api/performer/<int:performer_id>/', views.SearchViewSet.as_view({'get': 'get_performer_profile'}), name='performer_profile'),
 
     path('api/categories/<slug:category_slug>/subcategories/', views.SearchViewSet.as_view({'get': 'get_subcategories'}), name='subcategories'),
 ]

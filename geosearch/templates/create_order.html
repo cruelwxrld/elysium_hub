@@ -1,0 +1,424 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Создание заказа - Elysium{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 700px; margin: 100px auto 40px; padding: 0 20px;">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <h1><i class="fas fa-shopping-cart"></i> Создание заказа</h1>
+            <a href="{% url 'home' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Назад
+            </a>
+        </div>
+
+        <form method="post" id="orderForm">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label>Выберите исполнителя (необязательно)</label>
+                <select name="performer_id" id="performerSelect">
+                    <option value="">Любой исполнитель</option>
+                    {% for performer in performers %}
+                    <option value="{{ performer.user.id }}" {% if selected_performer_id == performer.user.id|stringformat:"s" %}selected{% endif %}>
+                        {{ performer.user.username }} - {{ performer.category|default:"Любая категория" }} ({{ performer.price|default:"Договорная" }} ₽/час)
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div id="performerServices" class="form-group"></div>
+
+            <div class="form-group">
+                <label>Категория услуги *</label>
+                <select name="category" id="categorySelect" required>
+                    <option value="">Выберите категорию</option>
+                    {% for value, label in categories %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" id="subcategoryGroup" style="display: none;">
+                <label>Конкретная услуга</label>
+                <select name="subcategory" id="subcategorySelect">
+                    <option value="">Выберите услугу</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Название заказа *</label>
+                <input type="text" name="title" required placeholder="Например: Уборка квартиры">
+            </div>
+
+            <div class="form-group">
+                <label>Описание заказа *</label>
+                <textarea name="description" rows="5" required placeholder="Опишите подробнее, что нужно сделать..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Бюджет (₽) *</label>
+                <input type="number" name="budget" required placeholder="1000">
+            </div>
+
+            <div id="priceHint" class="form-group"></div>
+
+            <div class="form-group">
+                <label>Желаемая дата</label>
+                <input type="datetime-local" name="deadline">
+            </div>
+
+            <div class="form-group">
+                <label>Адрес выполнения</label>
+                <input type="text" name="address" id="addressInput" placeholder="Улица, дом, квартира" value="{{ user_location.address|default:'' }}">
+                <button type="button" class="btn-location" onclick="getCurrentLocation()">
+                    <i class="fas fa-location-dot"></i> Использовать моё местоположение
+                </button>
+            </div>
+
+            <input type="hidden" name="latitude" id="latitudeInput" value="{{ user_location.latitude|default:'' }}">
+            <input type="hidden" name="longitude" id="longitudeInput" value="{{ user_location.longitude|default:'' }}">
+
+            <div class="form-buttons">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i> Отправить заказ
+                </button>
+                <a href="{% url 'home' %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .card {
+        background: white;
+        border-radius: 24px;
+        padding: 32px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #374151;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        font-size: 14px;
+        font-family: 'Inter', sans-serif;
+        transition: all 0.3s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .btn-location {
+        width: 100%;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        padding: 10px 16px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 13px;
+        margin-top: 8px;
+        transition: all 0.3s;
+    }
+
+    .btn-location:hover {
+        background: #e5e7eb;
+        border-color: #6366f1;
+        color: #6366f1;
+    }
+
+    .form-buttons {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+    }
+
+    .form-buttons .btn {
+        flex: 1;
+        justify-content: center;
+        padding: 14px;
+    }
+
+    @media (max-width: 768px) {
+        .card {
+            padding: 20px;
+        }
+        .form-buttons {
+            flex-direction: column;
+        }
+    }
+</style>
+
+<script>
+    const subcategoriesData = {
+        'cleaning': ['Комплексная уборка', 'Уборка после ремонта', 'Мытье окон', 'Химчистка мебели', 'Уборка офисов'],
+        'repair': ['Поклейка обоев', 'Укладка ламината', 'Установка дверей', 'Монтаж потолков', 'Сантехника', 'Электрика', 'Сборка мебели'],
+        'delivery': ['Доставка продуктов', 'Доставка еды', 'Курьерская доставка', 'Грузоперевозки'],
+        'construction': ['Отделка квартир', 'Перепланировка', 'Фасадные работы', 'Кровля'],
+        'design': ['Дизайн интерьера', '3D визуализация', 'Ландшафтный дизайн', 'Веб-дизайн'],
+        'photography': ['Свадебная съемка', 'Портретная съемка', 'Репортаж', 'Предметная съемка'],
+        'it': ['Разработка сайтов', 'Мобильные приложения', 'Настройка серверов', 'IT-консалтинг'],
+        'education': ['Репетиторство', 'Курсы', 'Изучение языков', 'Подготовка к экзаменам'],
+        'beauty': ['Парикмахер', 'Маникюр', 'Косметология', 'Визаж', 'Массаж']
+    };
+
+    const categorySelect = document.getElementById('categorySelect');
+    const subcategoryGroup = document.getElementById('subcategoryGroup');
+    const subcategorySelect = document.getElementById('subcategorySelect');
+    const performerSelect = document.getElementById('performerSelect');
+    const servicesDiv = document.getElementById('performerServices');
+    const priceHint = document.getElementById('priceHint');
+
+    function resetAllFields() {
+        categorySelect.disabled = false;
+        categorySelect.value = '';
+        subcategoryGroup.style.display = 'none';
+        subcategorySelect.innerHTML = '<option value="">Выберите услугу</option>';
+
+        if (servicesDiv) {
+            servicesDiv.style.display = 'none';
+            servicesDiv.innerHTML = '';
+        }
+
+        if (priceHint) {
+            priceHint.innerHTML = '';
+        }
+    }
+
+    performerSelect.addEventListener('change', async function() {
+        const performerId = this.value;
+
+        if (!performerId) {
+            resetAllFields();
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/performer/${performerId}/`);
+            const data = await response.json();
+
+            if (response.ok) {
+                if (data.category) {
+                    categorySelect.value = data.category;
+                    categorySelect.disabled = true;
+                    loadSubcategories(data.category);
+                } else {
+                    categorySelect.disabled = false;
+                    categorySelect.value = '';
+                    subcategoryGroup.style.display = 'none';
+                }
+
+                if (data.price) {
+                    priceHint.innerHTML = `<small style="color:#10b981;">💰 Рекомендуемый бюджет: от ${data.price} ₽/час</small>`;
+                } else {
+                    priceHint.innerHTML = '';
+                }
+
+                if (data.services && data.services.length > 0) {
+                    servicesDiv.style.display = 'block';
+                    servicesDiv.innerHTML = `
+                        <label><i class="fas fa-list-check"></i> Услуги исполнителя</label>
+                        <div style="background:#f3f4f6; padding:12px; border-radius:12px;">
+                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                                ${data.services.map(s => `<span style="background:#e0e7ff; color:#4f46e5; padding:4px 12px; border-radius:20px; font-size:12px;">${s}</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    servicesDiv.style.display = 'none';
+                    servicesDiv.innerHTML = '';
+                }
+
+                showNotification(`Выбран исполнитель: ${data.username}`, 'success');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+        }
+    });
+
+    categorySelect.addEventListener('change', function() {
+        const category = this.value;
+
+        if (performerSelect.value) {
+            return;
+        }
+
+        if (!performerSelect.value) {
+            if (category && subcategoriesData[category]) {
+                subcategorySelect.innerHTML = '<option value="">Выберите услугу</option>';
+                subcategoriesData[category].forEach(sub => {
+                    subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+                });
+                subcategoryGroup.style.display = 'block';
+            } else {
+                subcategoryGroup.style.display = 'none';
+            }
+        }
+
+        loadSubcategories(this.value);
+    });
+
+    function getCurrentLocation() {
+        if (!navigator.geolocation) {
+            showNotification('Геолокация не поддерживается', 'error');
+            return;
+        }
+
+        showNotification('Определяем местоположение...', 'info');
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+
+                document.getElementById('latitudeInput').value = lat;
+                document.getElementById('longitudeInput').value = lng;
+
+                fetch(`/api/search/reverse_geocode/?lat=${lat}&lng=${lng}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.address) {
+                            document.getElementById('addressInput').value = data.address;
+                        }
+                        showNotification('Местоположение определено!', 'success');
+                    });
+            },
+            () => showNotification('Не удалось определить местоположение', 'error')
+        );
+    }
+
+    function showNotification(message, type) {
+        const notification = document.getElementById('notification');
+        if (notification) {
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+            setTimeout(() => notification.style.display = 'none', 3000);
+        }
+    }
+
+    function loadSubcategories(category) {
+        if (category && subcategoriesData[category]) {
+            subcategorySelect.innerHTML = '<option value="">Выберите услугу</option>';
+            subcategoriesData[category].forEach(sub => {
+                subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+            });
+            subcategoryGroup.style.display = 'block';
+        } else {
+            subcategoryGroup.style.display = 'none';
+        }
+    }
+
+    document.getElementById('performerSelect').addEventListener('change', async function() {
+        const performerId = this.value;
+        const categorySelect = document.getElementById('categorySelect');
+        const subcategoryGroup = document.getElementById('subcategoryGroup');
+        const subcategorySelect = document.getElementById('subcategorySelect');
+        const priceInput = document.getElementById('priceHint');
+
+        if (!performerId) {
+            categorySelect.disabled = false;
+            categorySelect.value = '';
+            subcategoryGroup.style.display = 'none';
+            subcategorySelect.innerHTML = '<option value="">Выберите услугу</option>';
+            servicesDiv.style.display = 'none';
+            servicesDiv.innerHTML = '';
+            priceHint.innerHTML = '';
+
+            const servicesContainer = document.getElementById('performerServices');
+            if (servicesContainer) {
+                servicesContainer.style.display = 'none';
+                servicesContainer.innerHTML = '';
+            }
+
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/performer/${performerId}/`);
+            const data = await response.json();
+
+            if (response.ok) {
+                if (data.category) {
+                    categorySelect.value = data.category;
+                    categorySelect.disabled = true;
+
+                    if (subcategoriesData[data.category]) {
+                        subcategorySelect.innerHTML = '<option value="">Выберите услугу</option>';
+                        subcategoriesData[data.category].forEach(sub => {
+                            subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+                        });
+                        subcategoryGroup.style.display = 'block';
+                    } else {
+                        subcategoryGroup.style.display = 'none';
+                    }
+                } else {
+                    categorySelect.disabled = false;
+                    categorySelect.value = '';
+                    subcategoryGroup.style.display = 'none';
+                }
+
+                if (data.price) {
+                    priceHint.innerHTML = `<small style="color:#10b981;">💰 Рекомендуемый бюджет: от ${data.price} ₽/час</small>`;
+                } else {
+                    priceHint.innerHTML = '';
+                }
+
+                if (data.services && data.services.length > 0) {
+                    servicesDiv.style.display = 'block';
+                    servicesDiv.innerHTML = `
+                        <label><i class="fas fa-list-check"></i> Услуги исполнителя</label>
+                        <div style="background:#f3f4f6; padding:12px; border-radius:12px;">
+                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                                ${data.services.map(s => `<span style="background:#e0e7ff; color:#4f46e5; padding:4px 12px; border-radius:20px; font-size:12px;">${s}</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    servicesDiv.style.display = 'none';
+                    servicesDiv.innerHTML = '';
+                }
+
+                showNotification(`Выбран исполнитель: ${data.username}`, 'success');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const performerId = urlParams.get('performer_id');
+
+        if (performerId && performerSelect) {
+            performerSelect.value = performerId;
+            performerSelect.dispatchEvent(new Event('change'));
+        } else {
+            resetAllFields();
+        }
+    });
+</script>
+{% endblock %}

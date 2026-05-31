@@ -300,8 +300,8 @@ class SearchViewSet(viewsets.ViewSet):
         return R * c
 
     @action(detail=False, methods=['get'], url_path='performer/(?P<performer_id>[^/.]+)')
-    def get_performer_profile(self, request, performer_id=None):
-        """Получение профиля исполнителя по ID"""
+    def get_performer_profile_api(self, request, performer_id=None):
+        """Получение профиля исполнителя по API"""
         if not performer_id:
             return Response({'error': 'performer_id обязателен'}, status=400)
 
@@ -317,13 +317,19 @@ class SearchViewSet(viewsets.ViewSet):
             if profile.services:
                 services_list = [s.strip() for s in profile.services.split(',') if s.strip()]
 
-            # Получаем название категории для отображения
-            category_display = profile.category
+            if not services_list and profile.category:
+                default_services = {
+                    'cleaning': ['Комплексная уборка', 'Уборка после ремонта', 'Мытье окон'],
+                    'repair': ['Поклейка обоев', 'Укладка ламината', 'Сантехника', 'Электрика'],
+                    'delivery': ['Доставка продуктов', 'Доставка еды', 'Курьерская доставка'],
+                    'it': ['Разработка сайтов', 'Настройка серверов', 'IT-консалтинг'],
+                }
+                services_list = default_services.get(profile.category, [])
 
             return JsonResponse({
                 'id': user.id,
                 'username': user.username,
-                'category': category_display,
+                'category': profile.category,
                 'price': float(profile.price) if profile.price else None,
                 'services': services_list,
                 'description': profile.description,

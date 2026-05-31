@@ -173,16 +173,91 @@
 </style>
 
 <script>
-    const subcategoriesData = {
-        'cleaning': ['Комплексная уборка', 'Уборка после ремонта', 'Мытье окон', 'Химчистка мебели', 'Уборка офисов'],
-        'repair': ['Поклейка обоев', 'Укладка ламината', 'Установка дверей', 'Монтаж потолков', 'Сантехника', 'Электрика', 'Сборка мебели'],
-        'delivery': ['Доставка продуктов', 'Доставка еды', 'Курьерская доставка', 'Грузоперевозки'],
-        'construction': ['Отделка квартир', 'Перепланировка', 'Фасадные работы', 'Кровля'],
-        'design': ['Дизайн интерьера', '3D визуализация', 'Ландшафтный дизайн', 'Веб-дизайн'],
-        'photography': ['Свадебная съемка', 'Портретная съемка', 'Репортаж', 'Предметная съемка'],
-        'it': ['Разработка сайтов', 'Мобильные приложения', 'Настройка серверов', 'IT-консалтинг'],
-        'education': ['Репетиторство', 'Курсы', 'Изучение языков', 'Подготовка к экзаменам'],
-        'beauty': ['Парикмахер', 'Маникюр', 'Косметология', 'Визаж', 'Массаж']
+    const searchSubcategoriesData = {
+        'cleaning': [
+            'Комплексная уборка квартиры',
+            'Уборка после ремонта',
+            'Мытье окон',
+            'Химчистка мебели',
+            'Уборка офисов',
+            'Генеральная уборка',
+            'Поддерживающая уборка'
+        ],
+        'repair': [
+            'Поклейка обоев',
+            'Укладка ламината',
+            'Установка дверей',
+            'Монтаж натяжных потолков',
+            'Штукатурка стен',
+            'Сантехнические работы',
+            'Электромонтаж',
+            'Сборка мебели',
+            'Малярные работы'
+        ],
+        'delivery': [
+            'Доставка продуктов',
+            'Доставка готовой еды',
+            'Курьерская доставка',
+            'Грузоперевозки',
+            'Доставка лекарств',
+            'Доставка цветов'
+        ],
+        'construction': [
+            'Отделка квартир',
+            'Перепланировка',
+            'Фасадные работы',
+            'Кровельные работы',
+            'Фундаментные работы',
+            'Ландшафтный дизайн'
+        ],
+        'design': [
+            'Дизайн интерьера',
+            '3D визуализация',
+            'Ландшафтный дизайн',
+            'Веб-дизайн',
+            'Графический дизайн',
+            'Архитектурное проектирование'
+        ],
+        'photography': [
+            'Свадебная фотосъемка',
+            'Портретная фотосессия',
+            'Репортажная съемка',
+            'Предметная съемка',
+            'Аэрофотосъемка',
+            'Видеосъемка и монтаж'
+        ],
+        'it': [
+            'Разработка сайтов',
+            'Мобильные приложения',
+            'Настройка серверов',
+            'IT-консалтинг',
+            'Техническая поддержка',
+            'Разработка телеграм-ботов'
+        ],
+        'education': [
+            'Репетиторство онлайн',
+            'Курсы программирования',
+            'Изучение языков',
+            'Подготовка к экзаменам',
+            'Музыкальные занятия',
+            'Танцевальные мастер-классы'
+        ],
+        'beauty': [
+            'Парикмахерские услуги',
+            'Маникюр и педикюр',
+            'Косметология',
+            'Визаж и макияж',
+            'Массаж и СПА',
+            'Наращивание ресниц'
+        ],
+        'other': [
+            'Юридические консультации',
+            'Бухгалтерские услуги',
+            'Перевод текстов',
+            'Психологическая помощь',
+            'Фитнес тренировки',
+            'Выгул собак'
+        ]
     };
 
     const categorySelect = document.getElementById('categorySelect');
@@ -191,6 +266,31 @@
     const performerSelect = document.getElementById('performerSelect');
     const servicesDiv = document.getElementById('performerServices');
     const priceHint = document.getElementById('priceHint');
+
+    function selectService(serviceName) {
+        const subcategorySelect = document.getElementById('subcategorySelect');
+        if (subcategorySelect) {
+            let found = false;
+            for (let i = 0; i < subcategorySelect.options.length; i++) {
+                if (subcategorySelect.options[i].value === serviceName) {
+                    subcategorySelect.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                // Если услуги нет в select, добавляем её
+                const option = document.createElement('option');
+                option.value = serviceName;
+                option.text = serviceName;
+                subcategorySelect.appendChild(option);
+                subcategorySelect.value = serviceName;
+            }
+
+            showNotification(`Выбрана услуга: ${serviceName}`, 'success');
+        }
+    }
 
     function resetAllFields() {
         categorySelect.disabled = false;
@@ -224,7 +324,17 @@
                 if (data.category) {
                     categorySelect.value = data.category;
                     categorySelect.disabled = true;
-                    loadSubcategories(data.category);
+
+                    if (data.services && data.services.length > 0) {
+                        subcategorySelect.innerHTML = '<option value="">Выберите услугу</option>';
+                        data.services.forEach(service => {
+                            subcategorySelect.innerHTML += `<option value="${service}">${service}</option>`;
+                        });
+                        subcategoryGroup.style.display = 'block';
+                    } else {
+                        subcategoryGroup.style.display = 'none';
+                        subcategorySelect.innerHTML = '<option value="">Нет доступных услуг</option>';
+                    }
                 } else {
                     categorySelect.disabled = false;
                     categorySelect.value = '';
@@ -243,8 +353,9 @@
                         <label><i class="fas fa-list-check"></i> Услуги исполнителя</label>
                         <div style="background:#f3f4f6; padding:12px; border-radius:12px;">
                             <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                                ${data.services.map(s => `<span style="background:#e0e7ff; color:#4f46e5; padding:4px 12px; border-radius:20px; font-size:12px;">${s}</span>`).join('')}
+                                ${data.services.map(s => `<span style="background:#e0e7ff; color:#4f46e5; padding:4px 12px; border-radius:20px; font-size:12px; cursor:pointer;" onclick="selectService('${s}')">${s}</span>`).join('')}
                             </div>
+                            <small style="display:block; margin-top:8px; color:#6b7280;">👆 Нажмите на услугу, чтобы выбрать</small>
                         </div>
                     `;
                 } else {

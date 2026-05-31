@@ -27,7 +27,7 @@ urlpatterns = [
 
     path('privacy/', TemplateView.as_view(template_name='privacy.html'), name='privacy'),
 
-    path('api/performer/<int:performer_id>/', views.SearchViewSet.as_view({'get': 'get_performer_profile'}), name='performer_profile'),
+    path('api/performer/<int:performer_id>/', views.SearchViewSet.as_view({'get': 'get_performer_profile_api'}), name='performer_profile'),
 
     path('api/categories/<slug:category_slug>/subcategories/', views.SearchViewSet.as_view({'get': 'get_subcategories'}), name='subcategories'),
 ]

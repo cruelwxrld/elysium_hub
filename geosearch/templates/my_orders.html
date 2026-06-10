@@ -20,7 +20,15 @@
                 <div class="order-header">
                     <div>
                         <strong>{{ order.title }}</strong>
-                        <span class="order-status status-{{ order.status }}">{{ order.get_status_display }}</span>
+                        <span class="order-status status-{{ order.status }}">
+                            {% if order.status == 'pending' %}Ожидает исполнителя
+                            {% elif order.status == 'accepted' %}Принят исполнителем
+                            {% elif order.status == 'in_progress' %}В работе
+                            {% elif order.status == 'waiting_confirmation' %}Ожидает вашего подтверждения
+                            {% elif order.status == 'completed' %}Завершен
+                            {% elif order.status == 'cancelled' %}Отменен
+                            {% endif %}
+                        </span>
                     </div>
                     <div class="order-budget">{{ order.budget }} ₽</div>
                 </div>
@@ -29,6 +37,14 @@
                     <div><i class="fas fa-user"></i> Исполнитель: {{ order.performer.username|default:"Не назначен" }}</div>
                     <div><i class="fas fa-calendar"></i> Создан: {{ order.created_at|date:"d.m.Y H:i" }}</div>
                 </div>
+
+                {% if order.status == 'waiting_confirmation' %}
+                <div class="order-actions" style="margin-top: 15px;">
+                    <a href="{% url 'confirm_order' order.id %}" class="btn btn-success" onclick="return confirm('Подтвердить выполнение заказа?')">
+                        <i class="fas fa-check-circle"></i> Подтвердить выполнение
+                    </a>
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
         {% else %}
@@ -45,7 +61,15 @@
                 <div class="order-header">
                     <div>
                         <strong>{{ order.title }}</strong>
-                        <span class="order-status status-{{ order.status }}">{{ order.get_status_display }}</span>
+                        <span class="order-status status-{{ order.status }}">
+                            {% if order.status == 'pending' %}Новый заказ
+                            {% elif order.status == 'accepted' %}Вы приняли заказ
+                            {% elif order.status == 'in_progress' %}В работе
+                            {% elif order.status == 'waiting_confirmation' %}Ожидает подтверждения клиента
+                            {% elif order.status == 'completed' %}Завершен
+                            {% elif order.status == 'cancelled' %}Отменен
+                            {% endif %}
+                        </span>
                     </div>
                     <div class="order-budget">{{ order.budget }} ₽</div>
                 </div>
@@ -53,6 +77,18 @@
                     <div><i class="fas fa-tag"></i> {{ order.category }}</div>
                     <div><i class="fas fa-user"></i> Заказчик: {{ order.client.username }}</div>
                     <div><i class="fas fa-calendar"></i> Создан: {{ order.created_at|date:"d.m.Y H:i" }}</div>
+                </div>
+
+                <div class="order-actions" style="margin-top: 15px;">
+                    {% if order.status == 'pending' %}
+                    <a href="{% url 'accept_order' order.id %}" class="btn btn-success" onclick="return confirm('Принять этот заказ?')">
+                        <i class="fas fa-check"></i> Принять заказ
+                    </a>
+                    {% elif order.status == 'accepted' %}
+                    <a href="{% url 'complete_order' order.id %}" class="btn btn-primary" onclick="return confirm('Завершить работу над заказом?')">
+                        <i class="fas fa-check-double"></i> Завершить работу
+                    </a>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -89,6 +125,8 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: 12px;
+        flex-wrap: wrap;
+        gap: 10px;
     }
 
     .order-budget {
@@ -117,8 +155,24 @@
     .status-pending { background: #fef3c7; color: #d97706; }
     .status-accepted { background: #dbeafe; color: #2563eb; }
     .status-in_progress { background: #e0e7ff; color: #4f46e5; }
+    .status-waiting_confirmation { background: #fef3c7; color: #d97706; }
     .status-completed { background: #d1fae5; color: #059669; }
     .status-cancelled { background: #fee2e2; color: #dc2626; }
+
+    .order-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn-success {
+        background: #10b981;
+        color: white;
+    }
+
+    .btn-success:hover {
+        background: #059669;
+    }
 
     .empty-state {
         text-align: center;
@@ -130,7 +184,12 @@
         .order-header {
             flex-direction: column;
             align-items: flex-start;
-            gap: 8px;
+        }
+        .order-actions {
+            flex-direction: column;
+        }
+        .order-actions .btn {
+            text-align: center;
         }
     }
 </style>

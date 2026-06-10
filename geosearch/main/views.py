@@ -4,7 +4,7 @@ from django.shortcuts import render, redirect
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
@@ -181,7 +181,6 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @login_required
     def create_order_view(request):
-        """Страница создания заказа"""
         performers = Profile.objects.filter(
             role='performer',
             is_available=True
@@ -191,21 +190,35 @@ class OrderViewSet(viewsets.ModelViewSet):
             title = request.POST.get('title')
             description = request.POST.get('description')
             category = request.POST.get('category')
-            subcategory = request.POST.get('subcategory')
+            subcategory = request.POST.get('subcategory', '')
             budget = request.POST.get('budget')
-            deadline = request.POST.get('deadline')
-            address = request.POST.get('address')
+            address = request.POST.get('address', '')
             latitude = request.POST.get('latitude')
             longitude = request.POST.get('longitude')
             performer_id = request.POST.get('performer_id')
 
-            if not all([title, description, category, budget]):
+            if not title or not description or not category or not budget:
                 messages.error(request, 'Заполните все обязательные поля')
+                return redirect('create_order')
+
+            try:
+                budget = float(budget)
+            except ValueError:
+                messages.error(request, 'Бюджет должен быть числом')
                 return redirect('create_order')
 
             full_description = description
             if subcategory:
                 full_description = f"Услуга: {subcategory}\n\n{description}"
+
+            lat = 55.751244
+            lng = 37.618423
+            if latitude and longitude:
+                try:
+                    lat = float(latitude)
+                    lng = float(longitude)
+                except ValueError:
+                    pass
 
             order = Order.objects.create(
                 client=request.user,
@@ -214,22 +227,31 @@ class OrderViewSet(viewsets.ModelViewSet):
                 category=category,
                 budget=budget,
                 address=address or 'По согласованию',
-                latitude=float(latitude) if latitude else request.user.profile.latitude or 55.751244,
-                longitude=float(longitude) if longitude else request.user.profile.longitude or 37.618423,
+                latitude=lat,
+                longitude=lng,
                 status='pending'
             )
 
-            if performer_id:
+            if performer_id and performer_id != '':
                 try:
-                    performer = User.objects.get(id=performer_id)
-                    order.performer = performer
-                    order.status = 'accepted'
+                    performer_user = User.objects.get(id=performer_id)
+                    order.performer = performer_user
                     order.save()
-                    messages.success(request, f'Заказ "{title}" отправлен исполнителю!')
+
+                    Notification.objects.create(
+                        user=performer_user,
+                        order=order,
+                        type='new_order',
+                        title='Новый заказ!',
+                        message=f'Вам поступил заказ "{title}" от {request.user.username}. Бюджет: {budget} ₽. Примите или отклоните заказ.'
+                    )
+
+                    messages.success(request,
+                                     f'Заказ "{title}" отправлен исполнителю {performer_user.username}. Ожидайте подтверждения!')
                 except User.DoesNotExist:
                     messages.warning(request, 'Заказ создан, но исполнитель не найден')
             else:
-                messages.success(request, f'Заказ "{title}" успешно создан! Ожидайте отклика исполнителей')
+                messages.success(request, f'Заказ "{title}" успешно создан! Исполнители увидят его и откликнутся.')
 
             return redirect('my_orders')
 
@@ -263,10 +285,103 @@ class OrderViewSet(viewsets.ModelViewSet):
             'performers': performers,
             'categories': categories,
             'subcategories_data': subcategories_data,
-            'selected_performer_id': request.GET.get('performer_id'),
+            'selected_performer_id': request.GET.get('performer_id', ''),
             'user_location': request.user.profile,
         }
         return render(request, 'create_order.html', context)
+
+    @login_required
+    def accept_order_view(request, order_id):
+        """Исполнитель принимает заказ"""
+        try:
+            order = Order.objects.get(id=order_id, performer=request.user, status='pending')
+            order.status = 'accepted'
+            order.save()
+
+            Notification.objects.create(
+                user=order.client,
+                order=order,
+                type='order_accepted',
+                title='Заказ принят!',
+                message=f'Исполнитель {request.user.username} принял ваш заказ "{order.title}".'
+            )
+
+            messages.success(request, f'Вы приняли заказ "{order.title}"!')
+        except Order.DoesNotExist:
+            messages.error(request, 'Заказ не найден или уже принят')
+
+        return redirect('my_orders')
+
+    @login_required
+    def reject_order_view(request, order_id):
+        """Исполнитель отклоняет заказ"""
+        try:
+            order = Order.objects.get(id=order_id, performer=request.user, status='pending')
+            order.status = 'cancelled'
+            order.save()
+
+            Notification.objects.create(
+                user=order.client,
+                order=order,
+                type='order_cancelled',
+                title='Заказ отклонен',
+                message=f'Исполнитель {request.user.username} отклонил заказ "{order.title}".'
+            )
+
+            messages.info(request, f'Вы отклонили заказ "{order.title}"')
+        except Order.DoesNotExist:
+            messages.error(request, 'Заказ не найден')
+
+        return redirect('my_orders')
+
+    @login_required
+    def complete_order_view(request, order_id):
+        """Исполнитель завершает работу и отправляет на подтверждение заказчику"""
+        try:
+            order = Order.objects.get(id=order_id, performer=request.user, status='accepted')
+            order.status = 'waiting_confirmation'
+            order.save()
+
+            Notification.objects.create(
+                user=order.client,
+                order=order,
+                type='order_completed',
+                title='Заказ завершен!',
+                message=f'Исполнитель {request.user.username} завершил работу над заказом "{order.title}". Пожалуйста, подтвердите выполнение.'
+            )
+
+            messages.success(request, f'Вы завершили заказ "{order.title}". Ожидайте подтверждения от заказчика.')
+        except Order.DoesNotExist:
+            messages.error(request, 'Заказ не найден или уже завершен')
+
+        return redirect('my_orders')
+
+    @login_required
+    def confirm_order_view(request, order_id):
+        """Заказчик подтверждает выполнение заказа"""
+        try:
+            order = Order.objects.get(id=order_id, client=request.user, status='waiting_confirmation')
+            order.status = 'completed'
+            order.save()
+
+            if order.performer:
+                order.performer.profile.completed_orders += 1
+                order.performer.profile.save()
+
+            # Уведомление исполнителю
+            Notification.objects.create(
+                user=order.performer,
+                order=order,
+                type='order_completed',
+                title='Заказ подтвержден!',
+                message=f'Заказчик {request.user.username} подтвердил выполнение заказа "{order.title}". Спасибо за работу!'
+            )
+
+            messages.success(request, f'Вы подтвердили выполнение заказа "{order.title}"!')
+        except Order.DoesNotExist:
+            messages.error(request, 'Заказ не найден или уже подтвержден')
+
+        return redirect('my_orders')
 
     @login_required
     def my_orders_view(request):
@@ -298,47 +413,6 @@ class SearchViewSet(viewsets.ViewSet):
         c = 2 * atan2(sqrt(a), sqrt(1-a))
 
         return R * c
-
-    @action(detail=False, methods=['get'], url_path='performer/(?P<performer_id>[^/.]+)')
-    def get_performer_profile_api(self, request, performer_id=None):
-        """Получение профиля исполнителя по API"""
-        if not performer_id:
-            return Response({'error': 'performer_id обязателен'}, status=400)
-
-        try:
-            from django.contrib.auth.models import User
-            user = User.objects.get(id=performer_id)
-            profile = user.profile
-
-            if profile.role != 'performer':
-                return JsonResponse({'error': 'Пользователь не является исполнителем'}, status=400)
-
-            services_list = []
-            if profile.services:
-                services_list = [s.strip() for s in profile.services.split(',') if s.strip()]
-
-            if not services_list and profile.category:
-                default_services = {
-                    'cleaning': ['Комплексная уборка', 'Уборка после ремонта', 'Мытье окон'],
-                    'repair': ['Поклейка обоев', 'Укладка ламината', 'Сантехника', 'Электрика'],
-                    'delivery': ['Доставка продуктов', 'Доставка еды', 'Курьерская доставка'],
-                    'it': ['Разработка сайтов', 'Настройка серверов', 'IT-консалтинг'],
-                }
-                services_list = default_services.get(profile.category, [])
-
-            return JsonResponse({
-                'id': user.id,
-                'username': user.username,
-                'category': profile.category,
-                'price': float(profile.price) if profile.price else None,
-                'services': services_list,
-                'description': profile.description,
-                'rating': profile.rating,
-                'phone': profile.phone,
-                'completed_orders': profile.completed_orders
-            })
-        except User.DoesNotExist:
-            return JsonResponse({'error': 'Исполнитель не найден'}, status=404)
 
     @action(detail=False, methods=['get'])
     def find_performers(self, request):
@@ -652,3 +726,60 @@ def become_performer_view(request):
         'categories': categories,
     }
     return render(request, 'become_performer.html', context)
+
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    """API для уведомлений"""
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
+
+    @action(detail=False, methods=['post'])
+    def mark_as_read(self, request):
+        notification_id = request.data.get('notification_id')
+        if notification_id:
+            notification = Notification.objects.get(id=notification_id, user=request.user)
+            notification.is_read = True
+            notification.save()
+        return Response({'status': 'ok'})
+
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return Response({'status': 'ok'})
+
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        count = Notification.objects.filter(user=request.user, is_read=False).count()
+        return Response({'count': count})
+
+
+def get_performer_profile_api(request, performer_id):
+    """API для получения профиля исполнителя"""
+    try:
+        from django.contrib.auth.models import User
+        user = User.objects.get(id=performer_id)
+        profile = user.profile
+
+        if profile.role != 'performer':
+            return JsonResponse({'error': 'Пользователь не является исполнителем'}, status=400)
+
+        services_list = []
+        if profile.services:
+            services_list = [s.strip() for s in profile.services.split(',') if s.strip()]
+
+        return JsonResponse({
+            'id': user.id,
+            'username': user.username,
+            'category': profile.category,
+            'price': float(profile.price) if profile.price else None,
+            'services': services_list,
+            'description': profile.description,
+            'rating': profile.rating,
+            'phone': profile.phone,
+            'completed_orders': profile.completed_orders
+        })
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'Исполнитель не найден'}, status=404)

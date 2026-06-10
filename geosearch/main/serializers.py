@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Profile, Order, Review
+from .models import Profile, Order, Review, Notification
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -33,3 +33,9 @@ class ReviewSerializer(serializers.ModelSerializer):
         model = Review
         fields = '__all__'
         read_only_fields = ['client', 'created_at']
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = '__all__'

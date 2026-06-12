@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from main.models import ServiceCategory, Subcategory
+from geosearch.main.models import ServiceCategory, Subcategory
 
 
 class Command(BaseCommand):

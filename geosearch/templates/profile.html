@@ -54,6 +54,11 @@
                     <strong>Координаты:</strong> {{ profile.latitude }}, {{ profile.longitude }}
                 </div>
                 {% endif %}
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px;">
+                    <a href="{% url 'my_orders' %}" class="btn btn-secondary">
+                        <i class="fas fa-list-alt"></i> Мои заказы
+                    </a>
+                </div>
             </div>
 
             {% if profile.role == 'performer' %}

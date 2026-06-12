@@ -38,14 +38,13 @@ class AuthViewSet(viewsets.ViewSet):
         try:
             user = User.objects.create_user(username=username, password=password, email=email)
 
-            Profile.objects.create(
-                user=user,
-                phone=phone,
-                role=role,
-                is_available=True,
-                rating=0,
-                completed_orders=0
-            )
+            profile = user.profile
+            profile.phone = phone
+            profile.role = role
+            profile.is_available = True
+            profile.rating = 0
+            profile.completed_orders = 0
+            profile.save()
 
             token, _ = Token.objects.get_or_create(user=user)
 
@@ -146,6 +145,41 @@ class ProfileViewSet(viewsets.ModelViewSet):
         profile.save()
 
         return Response({'status': 'ok', 'latitude': lat, 'longitude': lng})
+
+    @login_required
+    def add_review_view(request):
+        """Добавление отзыва на исполнителя"""
+        if request.method == 'POST':
+            order_id = request.POST.get('order_id')
+            rating = request.POST.get('rating')
+            comment = request.POST.get('comment', '')
+
+            try:
+                order = Order.objects.get(id=order_id, client=request.user)
+
+                if order.status not in ['completed', 'cancelled']:
+                    return JsonResponse({'error': 'Оценку можно оставить только после завершения заказа'}, status=400)
+
+                if hasattr(order, 'review'):
+                    return JsonResponse({'error': 'Отзыв уже оставлен'}, status=400)
+
+                review = Review.objects.create(
+                    order=order,
+                    client=request.user,
+                    performer=order.performer,
+                    rating=int(rating),
+                    comment=comment
+                )
+
+                if order.performer:
+                    order.performer.profile.update_rating()
+
+                return JsonResponse({'success': True, 'message': 'Спасибо за отзыв!'})
+
+            except Order.DoesNotExist:
+                return JsonResponse({'error': 'Заказ не найден'}, status=404)
+
+        return JsonResponse({'error': 'Метод не разрешен'}, status=405)
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -368,7 +402,6 @@ class OrderViewSet(viewsets.ModelViewSet):
                 order.performer.profile.completed_orders += 1
                 order.performer.profile.save()
 
-            # Уведомление исполнителю
             Notification.objects.create(
                 user=order.performer,
                 order=order,
@@ -783,3 +816,57 @@ def get_performer_profile_api(request, performer_id):
         })
     except User.DoesNotExist:
         return JsonResponse({'error': 'Исполнитель не найден'}, status=404)
+
+
+class ReviewViewSet(viewsets.ModelViewSet):
+    """API для отзывов"""
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Review.objects.filter(client=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        order_id = request.data.get('order')
+        rating = request.data.get('rating')
+        comment = request.data.get('comment', '')
+
+        if not order_id:
+            return Response({'error': 'ID заказа обязателен'}, status=400)
+
+        if not rating:
+            return Response({'error': 'Оценка обязательна'}, status=400)
+
+        try:
+            order = Order.objects.get(id=order_id, client=request.user)
+            print(f"Заказ найден: {order.id}, статус: {order.status}")
+
+            if order.status not in ['completed', 'cancelled']:
+                return Response({'error': 'Оценку можно оставить только после завершения заказа'}, status=400)
+
+            if hasattr(order, 'review'):
+                return Response({'error': 'Отзыв уже оставлен'}, status=400)
+
+            if not order.performer:
+                return Response({'error': 'У заказа нет исполнителя'}, status=400)
+
+            review = Review.objects.create(
+                order=order,
+                client=request.user,
+                performer=order.performer,
+                rating=int(rating),
+                comment=comment
+            )
+
+            if order.performer:
+                order.performer.profile.update_rating()
+
+            serializer = self.get_serializer(review)
+            print(f"✅ Отзыв создан: ID={review.id}")
+            return Response(serializer.data, status=201)
+
+        except Order.DoesNotExist:
+            return Response({'error': 'Заказ не найден'}, status=404)
+        except Exception as e:
+            print(f"Ошибка: {e}")
+            return Response({'error': str(e)}, status=400)

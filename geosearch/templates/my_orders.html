@@ -45,6 +45,13 @@
                     </a>
                 </div>
                 {% endif %}
+                {% if order.status == 'completed' and not order.review %}
+                <div class="order-actions" style="margin-top: 15px;">
+                    <button class="btn btn-warning" onclick="openReviewModal({{ order.id }}, '{{ order.performer.username }}')">
+                        <i class="fas fa-star"></i> Оценить исполнителя
+                    </button>
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
         {% else %}
@@ -99,7 +106,67 @@
     {% endif %}
 </div>
 
+<div id="reviewModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 450px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2><i class="fas fa-star"></i> Оценить исполнителя</h2>
+            <button onclick="closeReviewModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+        </div>
+
+        <form id="reviewForm">
+            <input type="hidden" name="order_id" id="reviewOrderId">
+
+            <div class="form-group">
+                <label>Исполнитель: <span id="reviewPerformerName"></span></label>
+            </div>
+
+            <div class="form-group">
+                <label>Оценка *</label>
+                <div class="rating-stars">
+                    <i class="far fa-star" data-rating="1" onclick="setRating(1)"></i>
+                    <i class="far fa-star" data-rating="2" onclick="setRating(2)"></i>
+                    <i class="far fa-star" data-rating="3" onclick="setRating(3)"></i>
+                    <i class="far fa-star" data-rating="4" onclick="setRating(4)"></i>
+                    <i class="far fa-star" data-rating="5" onclick="setRating(5)"></i>
+                </div>
+                <input type="hidden" name="rating" id="ratingValue" required>
+            </div>
+
+            <div class="form-group">
+                <label>Комментарий (необязательно)</label>
+                <textarea name="comment" rows="4" placeholder="Расскажите о своем опыте работы с исполнителем..."></textarea>
+            </div>
+
+            <div class="form-buttons">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i> Отправить оценку
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeReviewModal()">
+                    <i class="fas fa-times"></i> Отмена
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <style>
+    .rating-stars {
+        display: flex;
+        gap: 8px;
+        font-size: 28px;
+        cursor: pointer;
+        margin-bottom: 10px;
+    }
+
+    .rating-stars i {
+        transition: all 0.2s;
+        color: #d1d5db;
+    }
+
+    .rating-stars i:hover,
+    .rating-stars i.active {
+        color: #fbbf24;
+    }
     .card {
         background: white;
         border-radius: 20px;
@@ -180,6 +247,15 @@
         color: #6b7280;
     }
 
+    .btn-warning {
+        background: #f59e0b;
+        color: white;
+    }
+
+    .btn-warning:hover {
+        background: #d97706;
+    }
+
     @media (max-width: 768px) {
         .order-header {
             flex-direction: column;
@@ -193,4 +269,125 @@
         }
     }
 </style>
+
+<script>
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    let currentOrderId = null;
+
+    function openReviewModal(orderId, performerName) {
+        currentOrderId = orderId;
+        document.getElementById('reviewOrderId').value = orderId;
+        document.getElementById('reviewPerformerName').textContent = performerName;
+        document.getElementById('reviewModal').style.display = 'flex';
+        resetRatingStars();
+    }
+
+    function closeReviewModal() {
+        document.getElementById('reviewModal').style.display = 'none';
+        document.getElementById('reviewForm').reset();
+        currentOrderId = null;
+    }
+
+    let currentRating = 0;
+
+    function setRating(rating) {
+        currentRating = rating;
+        document.getElementById('ratingValue').value = rating;
+
+        const stars = document.querySelectorAll('.rating-stars i');
+        stars.forEach((star, index) => {
+            if (index < rating) {
+                star.classList.remove('far');
+                star.classList.add('fas');
+                star.classList.add('active');
+            } else {
+                star.classList.remove('fas');
+                star.classList.add('far');
+                star.classList.remove('active');
+            }
+        });
+    }
+
+    function resetRatingStars() {
+        currentRating = 0;
+        document.getElementById('ratingValue').value = '';
+        const stars = document.querySelectorAll('.rating-stars i');
+        stars.forEach(star => {
+            star.classList.remove('fas');
+            star.classList.remove('active');
+            star.classList.add('far');
+        });
+    }
+
+    document.getElementById('reviewForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const orderId = document.getElementById('reviewOrderId').value;
+        const rating = document.getElementById('ratingValue').value;
+        const comment = document.querySelector('[name="comment"]').value;
+
+        console.log('Отправка отзыва:', {orderId, rating, comment});
+
+        if (!rating) {
+            showNotification('Пожалуйста, поставьте оценку', 'error');
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('authToken');
+            console.log('Токен:', token ? 'есть' : 'нет');
+
+            const response = await fetch('/api/reviews/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Token ${token}`
+                },
+                body: JSON.stringify({
+                    order: parseInt(orderId),
+                    rating: parseInt(rating),
+                    comment: comment
+                })
+            });
+
+            const data = await response.json();
+            console.log('Ответ сервера:', data);
+
+            if (response.ok) {
+                showNotification('Спасибо за вашу оценку!', 'success');
+                closeReviewModal();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showNotification(data.error || 'Ошибка при отправке оценки', 'error');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            showNotification('Ошибка соединения', 'error');
+        }
+    });
+
+    function showNotification(message, type) {
+        const notification = document.getElementById('notification');
+        if (notification) {
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+            setTimeout(() => notification.style.display = 'none', 3000);
+        }
+    }
+</script>
 {% endblock %}

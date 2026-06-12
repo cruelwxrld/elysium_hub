@@ -34,7 +34,6 @@ class ReviewSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['client', 'created_at']
 
-
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification

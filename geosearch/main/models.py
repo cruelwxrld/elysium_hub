@@ -41,6 +41,18 @@ class Profile(models.Model):
             return [s.strip() for s in self.services.split(',')]
         return []
 
+    def update_rating(self):
+        """Обновление рейтинга исполнителя на основе всех отзывов"""
+        from .models import Review
+        reviews = Review.objects.filter(performer=self.user)
+        if reviews.exists():
+            avg = reviews.aggregate(models.Avg('rating'))['rating__avg']
+            self.rating = round(avg, 1)
+            self.save()
+        else:
+            self.rating = 0
+            self.save()
+
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     """Создает профиль при создании пользователя"""

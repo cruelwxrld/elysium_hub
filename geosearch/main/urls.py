@@ -7,6 +7,7 @@ from . import views
 router = DefaultRouter()
 router.register(r'auth', views.AuthViewSet, basename='auth')
 router.register(r'profiles', views.ProfileViewSet, basename='profile')
+router.register(r'reviews', views.ReviewViewSet, basename='review')
 router.register(r'orders', views.OrderViewSet, basename='order')
 router.register(r'search', views.SearchViewSet, basename='search')
 router.register(r'notifications', views.NotificationViewSet, basename='notification')

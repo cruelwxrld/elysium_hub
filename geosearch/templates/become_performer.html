@@ -19,15 +19,15 @@
                 <label>Категория услуг *</label>
                 <select name="category" required>
                     <option value="">Выберите категорию</option>
-                    {% for value, label in categories %}
-                    <option value="{{ value }}">{{ label }}</option>
+                    {% for category in categories %}
+                    <option value="{{ category.slug }}">{{ category.icon }} {{ category.name }}</option>
                     {% endfor %}
                 </select>
             </div>
 
             <div class="form-group">
                 <label>Цена за час (₽) *</label>
-                <input type="number" name="price" required placeholder="1000">
+                <input type="number" name="price" required placeholder="1000" min="0" step="1">
             </div>
 
             <div class="form-group">
@@ -46,5 +46,49 @@
     </div>
 </div>
 
-<style src="{% static 'main/css/become_performer.css' %}"></style>
+<style>
+    .card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #4b5563;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        font-size: 14px;
+        font-family: 'Inter', sans-serif;
+        box-sizing: border-box;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .form-group textarea {
+        resize: none;
+        min-height: 100px;
+    }
+</style>
 {% endblock %}

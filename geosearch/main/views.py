@@ -285,9 +285,9 @@ class SearchViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=500)
 
-    @action(detail=False, methods=['get'])
-    def get_subcategories(self, request):
-        category_slug = request.query_params.get('category')
+    @action(detail=False, methods=['get'], url_path='categories/(?P<category_slug>[^/.]+)/subcategories')
+    def get_subcategories(self, request, category_slug=None):
+        """Получение подкатегорий по слагу категории"""
         if not category_slug:
             return Response({'error': 'Категория не указана'}, status=400)
 
@@ -297,7 +297,11 @@ class SearchViewSet(viewsets.ViewSet):
                 return Response({'subcategories': []})
 
             subcategories = list(category.subcategories.values('id', 'name', 'description'))
-            return Response({'success': True, 'category': category_slug, 'subcategories': subcategories})
+            return Response({
+                'success': True,
+                'category': category_slug,
+                'subcategories': subcategories
+            })
         except Exception as e:
             return Response({'error': str(e)}, status=500)
 

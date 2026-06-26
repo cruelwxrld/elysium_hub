@@ -164,6 +164,7 @@
         </div>
 
         <form id="reviewForm">
+            {% csrf_token %}
             <input type="hidden" name="order_id" id="reviewOrderId">
 
             <div class="form-group">
@@ -449,13 +450,17 @@
 
         try {
             const token = localStorage.getItem('authToken');
+            const csrftoken = getCookie('csrftoken');  // ← исправлено
+
             console.log('Токен:', token ? 'есть' : 'нет');
+            console.log('CSRF токен:', csrftoken ? 'есть' : 'нет');
 
             const response = await fetch('/api/reviews/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Token ${token}`
+                    'Authorization': `Token ${token}`,
+                    'X-CSRFToken': csrftoken  // ← теперь переменная определена
                 },
                 body: JSON.stringify({
                     order: parseInt(orderId),

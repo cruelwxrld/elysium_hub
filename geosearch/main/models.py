@@ -4,6 +4,39 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 
+class Category(models.Model):
+    """Категория услуг"""
+    name = models.CharField(max_length=100, verbose_name='Название')
+    slug = models.SlugField(unique=True, verbose_name='Слаг')
+    icon = models.CharField(max_length=50, blank=True, verbose_name='Иконка')
+    order = models.IntegerField(default=0, verbose_name='Порядок')
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name = 'Категория'
+        verbose_name_plural = 'Категории'
+
+    def __str__(self):
+        return self.name
+
+
+class Subcategory(models.Model):
+    """Подкатегория услуг (детализация)"""
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='subcategories')
+    name = models.CharField(max_length=200, verbose_name='Название')
+    slug = models.SlugField(blank=True, verbose_name='Слаг')
+    description = models.TextField(blank=True, verbose_name='Описание')
+    order = models.IntegerField(default=0, verbose_name='Порядок')
+
+    class Meta:
+        ordering = ['category', 'order', 'name']
+        verbose_name = 'Подкатегория'
+        verbose_name_plural = 'Подкатегории'
+
+    def __str__(self):
+        return f"{self.category.name} - {self.name}"
+
+
 class Profile(models.Model):
     """Профиль пользователя"""
     ROLE_CHOICES = [
@@ -38,7 +71,7 @@ class Profile(models.Model):
     def get_services_list(self):
         """Возвращает список услуг исполнителя"""
         if self.services:
-            return [s.strip() for s in self.services.split(',')]
+            return [s.strip() for s in self.services.split(',') if s.strip()]
         return []
 
     def update_rating(self):
@@ -53,12 +86,14 @@ class Profile(models.Model):
             self.rating = 0
             self.save()
 
+
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     """Создает профиль при создании пользователя"""
     if created:
         Profile.objects.create(user=instance)
         print(f"✅ Профиль создан для пользователя: {instance.username}")
+
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
@@ -83,8 +118,8 @@ class Order(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField()
     category = models.CharField(max_length=50)
-    subcategory = models.CharField(max_length=200, blank=True, null=True)  # Добавьте это поле
-    subcategory_details = models.TextField(blank=True, null=True)  # Дополнительные детали
+    subcategory = models.CharField(max_length=200, blank=True, null=True)
+    subcategory_details = models.TextField(blank=True, null=True)
 
     latitude = models.FloatField()
     longitude = models.FloatField()
@@ -99,6 +134,7 @@ class Order(models.Model):
     def __str__(self):
         return self.title
 
+
 class Review(models.Model):
     """Отзыв на исполнителя"""
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='review')
@@ -112,41 +148,6 @@ class Review(models.Model):
         super().save(*args, **kwargs)
         if hasattr(self.performer, 'profile'):
             self.performer.profile.update_rating()
-
-
-class ServiceCategory(models.Model):
-    """Основная категория услуг"""
-    name = models.CharField(max_length=100)
-    icon = models.CharField(max_length=50, blank=True)
-    slug = models.SlugField(unique=True)
-    order = models.IntegerField(default=0)
-
-    class Meta:
-        verbose_name = 'Категория услуг'
-        verbose_name_plural = 'Категории услуг'
-        ordering = ['order']
-
-    def __str__(self):
-        return self.name
-
-
-class Subcategory(models.Model):
-    """Подкатегория услуг (детализация)"""
-    category = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, related_name='subcategories')
-    name = models.CharField(max_length=200)
-    description = models.TextField(blank=True)
-    price_modifier = models.DecimalField(max_digits=5, decimal_places=2, default=1.0, help_text="Множитель цены")
-    estimated_time = models.IntegerField(default=60, help_text="Примерное время выполнения в минутах")
-    is_popular = models.BooleanField(default=False)
-    order = models.IntegerField(default=0)
-
-    class Meta:
-        verbose_name = 'Подкатегория'
-        verbose_name_plural = 'Подкатегории'
-        ordering = ['category', 'order']
-
-    def __str__(self):
-        return f"{self.category.name} - {self.name}"
 
 
 class Notification(models.Model):

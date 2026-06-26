@@ -1,89 +1,4 @@
-const searchSubcategoriesData = {
-    'cleaning': [
-        'Комплексная уборка квартиры',
-        'Уборка после ремонта',
-        'Мытье окон',
-        'Химчистка мебели',
-        'Уборка офисов',
-        'Генеральная уборка',
-        'Поддерживающая уборка'
-    ],
-    'repair': [
-        'Поклейка обоев',
-        'Укладка ламината',
-        'Установка дверей',
-        'Монтаж натяжных потолков',
-        'Штукатурка стен',
-        'Сантехнические работы',
-        'Электромонтаж',
-        'Сборка мебели',
-        'Малярные работы'
-    ],
-    'delivery': [
-        'Доставка продуктов',
-        'Доставка готовой еды',
-        'Курьерская доставка',
-        'Грузоперевозки',
-        'Доставка лекарств',
-        'Доставка цветов'
-    ],
-    'construction': [
-        'Отделка квартир',
-        'Перепланировка',
-        'Фасадные работы',
-        'Кровельные работы',
-        'Фундаментные работы',
-        'Ландшафтный дизайн'
-    ],
-    'design': [
-        'Дизайн интерьера',
-        '3D визуализация',
-        'Ландшафтный дизайн',
-        'Веб-дизайн',
-        'Графический дизайн',
-        'Архитектурное проектирование'
-    ],
-    'photography': [
-        'Свадебная фотосъемка',
-        'Портретная фотосессия',
-        'Репортажная съемка',
-        'Предметная съемка',
-        'Аэрофотосъемка',
-        'Видеосъемка и монтаж'
-    ],
-    'it': [
-        'Разработка сайтов',
-        'Мобильные приложения',
-        'Настройка серверов',
-        'IT-консалтинг',
-        'Техническая поддержка',
-        'Разработка телеграм-ботов'
-    ],
-    'education': [
-        'Репетиторство онлайн',
-        'Курсы программирования',
-        'Изучение языков',
-        'Подготовка к экзаменам',
-        'Музыкальные занятия',
-        'Танцевальные мастер-классы'
-    ],
-    'beauty': [
-        'Парикмахерские услуги',
-        'Маникюр и педикюр',
-        'Косметология',
-        'Визаж и макияж',
-        'Массаж и СПА',
-        'Наращивание ресниц'
-    ],
-    'other': [
-        'Юридические консультации',
-        'Бухгалтерские услуги',
-        'Перевод текстов',
-        'Психологическая помощь',
-        'Фитнес тренировки',
-        'Выгул собак'
-    ]
-};
+// index.js — без хардкода
 
 let map;
 let userPlacemark;
@@ -251,7 +166,7 @@ function setUserLocation(lat, lng) {
     searchPerformers();
 }
 
-function loadSearchSubcategories() {
+async function loadSearchSubcategories() {
     const category = document.getElementById('category').value;
     const subcategoryGroup = document.getElementById('searchSubcategoryGroup');
     const subcategorySelect = document.getElementById('searchSubcategory');
@@ -261,17 +176,23 @@ function loadSearchSubcategories() {
         return;
     }
 
-    const subItems = searchSubcategoriesData[category] || [];
+    try {
+        const response = await fetch(`/api/categories/${category}/subcategories/`);
+        const data = await response.json();
 
-    if (subItems.length > 0) {
         if (subcategorySelect) {
             subcategorySelect.innerHTML = '<option value="">Любая услуга</option>';
-            subItems.forEach(sub => {
-                subcategorySelect.innerHTML += `<option value="${sub}">${sub}</option>`;
-            });
+            if (data.subcategories && data.subcategories.length > 0) {
+                data.subcategories.forEach(sub => {
+                    subcategorySelect.innerHTML += `<option value="${sub.name}">${sub.name}</option>`;
+                });
+                if (subcategoryGroup) subcategoryGroup.style.display = 'block';
+            } else {
+                if (subcategoryGroup) subcategoryGroup.style.display = 'none';
+            }
         }
-        if (subcategoryGroup) subcategoryGroup.style.display = 'block';
-    } else {
+    } catch (error) {
+        console.error('Ошибка загрузки подкатегорий:', error);
         if (subcategoryGroup) subcategoryGroup.style.display = 'none';
     }
 }

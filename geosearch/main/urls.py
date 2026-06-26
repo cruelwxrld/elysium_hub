@@ -16,25 +16,23 @@ urlpatterns = [
     path('api/', include(router.urls)),
     path('api-token-auth/', obtain_auth_token, name='api_token_auth'),
 
-    path('api/subcategories/', views.SearchViewSet.as_view({'get': 'get_subcategories'}), name='subcategories'),
+    path('api/categories/', views.SearchViewSet.as_view({'get': 'get_all_categories'}), name='all_categories'),
+    path('api/categories/<slug:category_slug>/subcategories/', views.SearchViewSet.as_view({'get': 'get_subcategories'}), name='category_subcategories'),
 
-    path('accept-order/<int:order_id>/', views.OrderViewSet.accept_order_view, name='accept_order'),
-    path('reject-order/<int:order_id>/', views.OrderViewSet.reject_order_view, name='reject_order'),
-    path('complete-order/<int:order_id>/', views.OrderViewSet.complete_order_view, name='complete_order'),
-    path('confirm-order/<int:order_id>/', views.OrderViewSet.confirm_order_view, name='confirm_order'),
+    path('accept-order/<int:order_id>/', views.accept_order_view, name='accept_order'),
+    path('reject-order/<int:order_id>/', views.reject_order_view, name='reject_order'),
+    path('complete-order/<int:order_id>/', views.complete_order_view, name='complete_order'),
+    path('confirm-order/<int:order_id>/', views.confirm_order_view, name='confirm_order'),
 
     path('profile/', views.profile_view, name='profile'),
     path('profile/edit/', views.edit_profile_view, name='edit_profile'),
     path('become-performer/', views.become_performer_view, name='become_performer'),
 
-    path('', views.home, name='home'),
-
-    path('create-order/', views.OrderViewSet.create_order_view, name='create_order'),
-    path('my-orders/', views.OrderViewSet.my_orders_view, name='my_orders'),
-
-    path('privacy/', TemplateView.as_view(template_name='privacy.html'), name='privacy'),
+    path('create-order/', views.create_order_view, name='create_order'),
+    path('my-orders/', views.my_orders_view, name='my_orders'),
 
     path('api/performer/<int:performer_id>/', views.get_performer_profile_api, name='performer_profile'),
 
-    path('api/categories/<slug:category_slug>/subcategories/', views.SearchViewSet.as_view({'get': 'get_subcategories'}), name='subcategories'),
+    path('', views.home, name='home'),
+    path('privacy/', TemplateView.as_view(template_name='privacy.html'), name='privacy'),
 ]

@@ -39,9 +39,7 @@
 
             <div class="form-group" id="servicesGroup">
                 <label>Какие услуги вы предоставляете?</label>
-                <div class="services-checkboxes" id="servicesCheckboxes">
-                    <!-- Сюда динамически загрузятся подкатегории -->
-                </div>
+                <div class="services-checkboxes" id="servicesCheckboxes"> </div>
                 <input type="hidden" name="services" id="servicesInput" value="{{ profile.services|default:'' }}">
                 <small class="form-hint">Выберите конкретные услуги, которые вы готовы выполнять</small>
             </div>
@@ -57,8 +55,9 @@
             </div>
 
             <div class="form-group">
-                <label>
-                    <input type="checkbox" name="is_available" {% if profile.is_available %}checked{% endif %}>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" name="is_available" {% if profile.is_available %}checked{% endif %}
+                    style="width: 18px; height: 18px;">
                     Доступен для заказов
                 </label>
             </div>

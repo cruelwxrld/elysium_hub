@@ -3,6 +3,10 @@
 
 {% block title %}Мои заказы - Elysium{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'main/css/my_orders.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="container" style="max-width: 1200px; margin: 100px auto 40px; padding: 0 20px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
@@ -38,20 +42,42 @@
                     <div><i class="fas fa-calendar"></i> Создан: {{ order.created_at|date:"d.m.Y H:i" }}</div>
                 </div>
 
-                {% if order.status == 'waiting_confirmation' %}
+                {% if order.review %}
+                <div class="review-block">
+                    <div class="review-header">
+                        <span class="review-rating">
+                            {% for i in "12345"|make_list %}
+                                {% if forloop.counter <= order.review.rating %}
+                                    <i class="fas fa-star" style="color: #fbbf24;"></i>
+                                {% else %}
+                                    <i class="far fa-star" style="color: #d1d5db;"></i>
+                                {% endif %}
+                            {% endfor %}
+                            <span class="review-rating-text">({{ order.review.rating }})</span>
+                        </span>
+                        <span class="review-date">{{ order.review.created_at|date:"d.m.Y H:i" }}</span>
+                    </div>
+                    {% if order.review.comment %}
+                    <div class="review-comment">
+                        <i class="fas fa-quote-left" style="color: #9ca3af; font-size: 12px;"></i>
+                        {{ order.review.comment }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <div class="order-actions" style="margin-top: 15px;">
+                    {% if order.status == 'waiting_confirmation' %}
                     <a href="{% url 'confirm_order' order.id %}" class="btn btn-success" onclick="return confirm('Подтвердить выполнение заказа?')">
                         <i class="fas fa-check-circle"></i> Подтвердить выполнение
                     </a>
-                </div>
-                {% endif %}
-                {% if order.status == 'completed' and not order.review %}
-                <div class="order-actions" style="margin-top: 15px;">
+                    {% endif %}
+                    {% if order.status == 'completed' and not order.review %}
                     <button class="btn btn-warning" onclick="openReviewModal({{ order.id }}, '{{ order.performer.username }}')">
                         <i class="fas fa-star"></i> Оценить исполнителя
                     </button>
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
             {% endfor %}
         {% else %}
@@ -85,6 +111,30 @@
                     <div><i class="fas fa-user"></i> Заказчик: {{ order.client.username }}</div>
                     <div><i class="fas fa-calendar"></i> Создан: {{ order.created_at|date:"d.m.Y H:i" }}</div>
                 </div>
+
+                {% if order.review %}
+                <div class="review-block">
+                    <div class="review-header">
+                        <span class="review-rating">
+                            {% for i in "12345"|make_list %}
+                                {% if forloop.counter <= order.review.rating %}
+                                    <i class="fas fa-star" style="color: #fbbf24;"></i>
+                                {% else %}
+                                    <i class="far fa-star" style="color: #d1d5db;"></i>
+                                {% endif %}
+                            {% endfor %}
+                            <span class="review-rating-text">({{ order.review.rating }})</span>
+                        </span>
+                        <span class="review-date">{{ order.review.created_at|date:"d.m.Y H:i" }}</span>
+                    </div>
+                    {% if order.review.comment %}
+                    <div class="review-comment">
+                        <i class="fas fa-quote-left" style="color: #9ca3af; font-size: 12px;"></i>
+                        {{ order.review.comment }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
 
                 <div class="order-actions" style="margin-top: 15px;">
                     {% if order.status == 'pending' %}
@@ -134,7 +184,7 @@
 
             <div class="form-group">
                 <label>Комментарий (необязательно)</label>
-                <textarea name="comment" rows="4" placeholder="Расскажите о своем опыте работы с исполнителем..."></textarea>
+                <textarea name="comment" rows="6" placeholder="Расскажите о своем опыте работы с исполнителем..." style="resize: none; width: 100%; padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; font-size: 14px; font-family: 'Inter', sans-serif; min-height: 120px; box-sizing: border-box;"></textarea>
             </div>
 
             <div class="form-buttons">
@@ -167,6 +217,56 @@
     .rating-stars i.active {
         color: #fbbf24;
     }
+
+    .review-block {
+        margin-top: 12px;
+        padding: 12px 16px;
+        background: #f8fafc;
+        border-radius: 12px;
+        border-left: 3px solid #fbbf24;
+    }
+
+    .review-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+    }
+
+    .review-rating {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .review-rating i {
+        font-size: 14px;
+    }
+
+    .review-rating-text {
+        font-size: 13px;
+        color: #4b5563;
+        margin-left: 4px;
+    }
+
+    .review-date {
+        font-size: 11px;
+        color: #9ca3af;
+    }
+
+    .review-comment {
+        font-size: 14px;
+        color: #374151;
+        line-height: 1.5;
+        margin-top: 4px;
+        padding-left: 4px;
+    }
+
+    .review-comment i {
+        margin-right: 6px;
+        opacity: 0.6;
+    }
+
     .card {
         background: white;
         border-radius: 20px;

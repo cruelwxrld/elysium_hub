@@ -218,7 +218,15 @@ class OrderViewSet(viewsets.ModelViewSet):
         performers = Profile.objects.filter(
             role='performer',
             is_available=True
-        ).select_related('user')
+        ).exclude(user=request.user).select_related('user')
+
+        orders_as_client = Order.objects.filter(
+            client=request.user
+        ).select_related('performer', 'review').order_by('-created_at')
+
+        orders_as_performer = Order.objects.filter(
+            performer=request.user
+        ).select_related('client', 'review').order_by('-created_at') if request.user.profile.role == 'performer' else []
 
         if request.method == 'POST':
             title = request.POST.get('title')
@@ -230,6 +238,15 @@ class OrderViewSet(viewsets.ModelViewSet):
             latitude = request.POST.get('latitude')
             longitude = request.POST.get('longitude')
             performer_id = request.POST.get('performer_id')
+
+            if performer_id and performer_id != '':
+                try:
+                    performer_user = User.objects.get(id=performer_id)
+                    if performer_user == request.user:
+                        messages.error(request, 'Вы не можете заказать услугу у самого себя')
+                        return redirect('create_order')
+                except User.DoesNotExist:
+                    pass
 
             if not title or not description or not category or not budget:
                 messages.error(request, 'Заполните все обязательные поля')
@@ -321,6 +338,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             'subcategories_data': subcategories_data,
             'selected_performer_id': request.GET.get('performer_id', ''),
             'user_location': request.user.profile,
+            'client_orders': orders_as_client,
+            'performer_orders': orders_as_performer,
         }
         return render(request, 'create_order.html', context)
 
@@ -830,6 +849,18 @@ class ReviewViewSet(viewsets.ModelViewSet):
         order_id = request.data.get('order')
         rating = request.data.get('rating')
         comment = request.data.get('comment', '')
+        performer_id = request.data.get('performer_id')
+
+        if performer_id:
+            try:
+                performer_user = User.objects.get(id=performer_id)
+                if performer_user == request.user:
+                    return Response(
+                        {'error': 'Вы не можете заказать услугу у самого себя'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except User.DoesNotExist:
+                pass
 
         if not order_id:
             return Response({'error': 'ID заказа обязателен'}, status=400)

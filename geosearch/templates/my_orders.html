@@ -3,10 +3,6 @@
 
 {% block title %}Мои заказы - Elysium{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'main/css/my_orders.css' %}">
-{% endblock %}
-
 {% block content %}
 <div class="container" style="max-width: 1200px; margin: 100px auto 40px; padding: 0 20px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
@@ -36,6 +32,33 @@
                     </div>
                     <div class="order-budget">{{ order.budget }} ₽</div>
                 </div>
+
+                <div class="order-actions" style="margin-top: 15px;">
+                    {% if order.status == 'waiting_confirmation' %}
+                    <a href="{% url 'confirm_order' order.id %}" class="btn btn-success" onclick="return confirm('Подтвердить выполнение заказа?')">
+                        <i class="fas fa-check-circle"></i> Подтвердить выполнение
+                    </a>
+                    {% endif %}
+
+                    {% if order.status == 'completed' and not order.review %}
+                    <button class="btn btn-warning" onclick="openReviewModal({{ order.id }}, '{{ order.performer.username }}')">
+                        <i class="fas fa-star"></i> Оценить исполнителя
+                    </button>
+                    {% endif %}
+
+                    {% if order.status == 'pending' %}
+                    <a href="{% url 'cancel_order' order.id %}" class="btn btn-danger" onclick="return confirm('Отменить заказ?')">
+                        <i class="fas fa-times"></i> Отменить заказ
+                    </a>
+                    {% endif %}
+
+                    {% if order.status == 'accepted' %}
+                    <button class="btn btn-danger" onclick="showCancelReasonModal({{ order.id }})">
+                        <i class="fas fa-times"></i> Запросить отмену
+                    </button>
+                    {% endif %}
+                </div>
+
                 <div class="order-details">
                     <div><i class="fas fa-tag"></i> {{ order.category }}</div>
                     <div><i class="fas fa-user"></i> Исполнитель: {{ order.performer.username|default:"Не назначен" }}</div>
@@ -65,19 +88,6 @@
                     {% endif %}
                 </div>
                 {% endif %}
-
-                <div class="order-actions" style="margin-top: 15px;">
-                    {% if order.status == 'waiting_confirmation' %}
-                    <a href="{% url 'confirm_order' order.id %}" class="btn btn-success" onclick="return confirm('Подтвердить выполнение заказа?')">
-                        <i class="fas fa-check-circle"></i> Подтвердить выполнение
-                    </a>
-                    {% endif %}
-                    {% if order.status == 'completed' and not order.review %}
-                    <button class="btn btn-warning" onclick="openReviewModal({{ order.id }}, '{{ order.performer.username }}')">
-                        <i class="fas fa-star"></i> Оценить исполнителя
-                    </button>
-                    {% endif %}
-                </div>
             </div>
             {% endfor %}
         {% else %}
@@ -106,6 +116,27 @@
                     </div>
                     <div class="order-budget">{{ order.budget }} ₽</div>
                 </div>
+
+                <div class="order-actions" style="margin-top: 15px;">
+                    {% if order.status == 'pending' %}
+                    <a href="{% url 'accept_order' order.id %}" class="btn btn-success" onclick="return confirm('Принять этот заказ?')">
+                        <i class="fas fa-check"></i> Принять заказ
+                    </a>
+                    <a href="{% url 'cancel_order' order.id %}" class="btn btn-danger" onclick="return confirm('Отменить заказ?')">
+                        <i class="fas fa-times"></i> Отменить заказ
+                    </a>
+                    {% elif order.status == 'accepted' %}
+                    <a href="{% url 'complete_order' order.id %}" class="btn btn-primary" onclick="return confirm('Завершить работу над заказом?')">
+                        <i class="fas fa-check-double"></i> Завершить работу
+                    </a>
+                    {% if order.cancel_requested %}
+                    <a href="{% url 'approve_cancel' order.id %}" class="btn btn-warning" onclick="return confirm('Подтвердить отмену заказа?')">
+                        <i class="fas fa-check"></i> Подтвердить отмену
+                    </a>
+                    {% endif %}
+                    {% endif %}
+                </div>
+
                 <div class="order-details">
                     <div><i class="fas fa-tag"></i> {{ order.category }}</div>
                     <div><i class="fas fa-user"></i> Заказчик: {{ order.client.username }}</div>
@@ -135,18 +166,6 @@
                     {% endif %}
                 </div>
                 {% endif %}
-
-                <div class="order-actions" style="margin-top: 15px;">
-                    {% if order.status == 'pending' %}
-                    <a href="{% url 'accept_order' order.id %}" class="btn btn-success" onclick="return confirm('Принять этот заказ?')">
-                        <i class="fas fa-check"></i> Принять заказ
-                    </a>
-                    {% elif order.status == 'accepted' %}
-                    <a href="{% url 'complete_order' order.id %}" class="btn btn-primary" onclick="return confirm('Завершить работу над заказом?')">
-                        <i class="fas fa-check-double"></i> Завершить работу
-                    </a>
-                    {% endif %}
-                </div>
             </div>
             {% endfor %}
         {% else %}
@@ -200,299 +219,30 @@
     </div>
 </div>
 
-<style>
-    .rating-stars {
-        display: flex;
-        gap: 8px;
-        font-size: 28px;
-        cursor: pointer;
-        margin-bottom: 10px;
-    }
+<div id="cancelReasonModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 450px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2><i class="fas fa-times-circle"></i> Причина отмены</h2>
+            <button onclick="closeCancelReasonModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+        </div>
+        <form method="post" id="cancelReasonForm" action="{% url 'cancel_order' 0 %}">
+            {% csrf_token %}
+            <input type="hidden" name="order_id" id="cancelOrderId">
+            <div class="form-group">
+                <label>Укажите причину отмены *</label>
+                <textarea name="reason" rows="6" required placeholder="Опишите причину отмены заказа..." style="resize: none; width: 100%; padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; font-size: 14px; font-family: 'Inter', sans-serif; min-height: 120px; box-sizing: border-box;"></textarea>
+            </div>
+            <div class="form-buttons">
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-times"></i> Отправить запрос
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeCancelReasonModal()">
+                    <i class="fas fa-times"></i> Отмена
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
-    .rating-stars i {
-        transition: all 0.2s;
-        color: #d1d5db;
-    }
-
-    .rating-stars i:hover,
-    .rating-stars i.active {
-        color: #fbbf24;
-    }
-
-    .review-block {
-        margin-top: 12px;
-        padding: 12px 16px;
-        background: #f8fafc;
-        border-radius: 12px;
-        border-left: 3px solid #fbbf24;
-    }
-
-    .review-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 6px;
-    }
-
-    .review-rating {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .review-rating i {
-        font-size: 14px;
-    }
-
-    .review-rating-text {
-        font-size: 13px;
-        color: #4b5563;
-        margin-left: 4px;
-    }
-
-    .review-date {
-        font-size: 11px;
-        color: #9ca3af;
-    }
-
-    .review-comment {
-        font-size: 14px;
-        color: #374151;
-        line-height: 1.5;
-        margin-top: 4px;
-        padding-left: 4px;
-    }
-
-    .review-comment i {
-        margin-right: 6px;
-        opacity: 0.6;
-    }
-
-    .card {
-        background: white;
-        border-radius: 20px;
-        padding: 24px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-
-    .order-item {
-        border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        padding: 16px;
-        margin-bottom: 12px;
-        transition: all 0.3s;
-    }
-
-    .order-item:hover {
-        border-color: #6366f1;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
-    }
-
-    .order-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .order-budget {
-        font-size: 18px;
-        font-weight: 700;
-        color: #10b981;
-    }
-
-    .order-details {
-        display: flex;
-        gap: 20px;
-        font-size: 13px;
-        color: #6b7280;
-        flex-wrap: wrap;
-    }
-
-    .order-status {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 600;
-        margin-left: 10px;
-    }
-
-    .status-pending { background: #fef3c7; color: #d97706; }
-    .status-accepted { background: #dbeafe; color: #2563eb; }
-    .status-in_progress { background: #e0e7ff; color: #4f46e5; }
-    .status-waiting_confirmation { background: #fef3c7; color: #d97706; }
-    .status-completed { background: #d1fae5; color: #059669; }
-    .status-cancelled { background: #fee2e2; color: #dc2626; }
-
-    .order-actions {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-
-    .btn-success {
-        background: #10b981;
-        color: white;
-    }
-
-    .btn-success:hover {
-        background: #059669;
-    }
-
-    .empty-state {
-        text-align: center;
-        padding: 40px;
-        color: #6b7280;
-    }
-
-    .btn-warning {
-        background: #f59e0b;
-        color: white;
-    }
-
-    .btn-warning:hover {
-        background: #d97706;
-    }
-
-    @media (max-width: 768px) {
-        .order-header {
-            flex-direction: column;
-            align-items: flex-start;
-        }
-        .order-actions {
-            flex-direction: column;
-        }
-        .order-actions .btn {
-            text-align: center;
-        }
-    }
-</style>
-
-<script>
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-
-    let currentOrderId = null;
-
-    function openReviewModal(orderId, performerName) {
-        currentOrderId = orderId;
-        document.getElementById('reviewOrderId').value = orderId;
-        document.getElementById('reviewPerformerName').textContent = performerName;
-        document.getElementById('reviewModal').style.display = 'flex';
-        resetRatingStars();
-    }
-
-    function closeReviewModal() {
-        document.getElementById('reviewModal').style.display = 'none';
-        document.getElementById('reviewForm').reset();
-        currentOrderId = null;
-    }
-
-    let currentRating = 0;
-
-    function setRating(rating) {
-        currentRating = rating;
-        document.getElementById('ratingValue').value = rating;
-
-        const stars = document.querySelectorAll('.rating-stars i');
-        stars.forEach((star, index) => {
-            if (index < rating) {
-                star.classList.remove('far');
-                star.classList.add('fas');
-                star.classList.add('active');
-            } else {
-                star.classList.remove('fas');
-                star.classList.add('far');
-                star.classList.remove('active');
-            }
-        });
-    }
-
-    function resetRatingStars() {
-        currentRating = 0;
-        document.getElementById('ratingValue').value = '';
-        const stars = document.querySelectorAll('.rating-stars i');
-        stars.forEach(star => {
-            star.classList.remove('fas');
-            star.classList.remove('active');
-            star.classList.add('far');
-        });
-    }
-
-    document.getElementById('reviewForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        const orderId = document.getElementById('reviewOrderId').value;
-        const rating = document.getElementById('ratingValue').value;
-        const comment = document.querySelector('[name="comment"]').value;
-
-        console.log('Отправка отзыва:', {orderId, rating, comment});
-
-        if (!rating) {
-            showNotification('Пожалуйста, поставьте оценку', 'error');
-            return;
-        }
-
-        try {
-            const token = localStorage.getItem('authToken');
-            const csrftoken = getCookie('csrftoken');  // ← исправлено
-
-            console.log('Токен:', token ? 'есть' : 'нет');
-            console.log('CSRF токен:', csrftoken ? 'есть' : 'нет');
-
-            const response = await fetch('/api/reviews/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Token ${token}`,
-                    'X-CSRFToken': csrftoken  // ← теперь переменная определена
-                },
-                body: JSON.stringify({
-                    order: parseInt(orderId),
-                    rating: parseInt(rating),
-                    comment: comment
-                })
-            });
-
-            const data = await response.json();
-            console.log('Ответ сервера:', data);
-
-            if (response.ok) {
-                showNotification('Спасибо за вашу оценку!', 'success');
-                closeReviewModal();
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showNotification(data.error || 'Ошибка при отправке оценки', 'error');
-            }
-        } catch (error) {
-            console.error('Ошибка:', error);
-            showNotification('Ошибка соединения', 'error');
-        }
-    });
-
-    function showNotification(message, type) {
-        const notification = document.getElementById('notification');
-        if (notification) {
-            notification.textContent = message;
-            notification.className = `notification ${type}`;
-            notification.style.display = 'block';
-            setTimeout(() => notification.style.display = 'none', 3000);
-        }
-    }
-</script>
+<script src="{% static 'main/js/my_orders.js' %}"></script>
 {% endblock %}

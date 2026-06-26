@@ -167,8 +167,8 @@ class SearchViewSet(viewsets.ViewSet):
         lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
         dlat = lat2 - lat1
         dlon = lon2 - lon1
-        a = sin(dlat/2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon/2) ** 2
-        c = 2 * atan2(sqrt(a), sqrt(1-a))
+        a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+        c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return R * c
 
     @action(detail=False, methods=['get'])
@@ -201,7 +201,8 @@ class SearchViewSet(viewsets.ViewSet):
             if distance <= radius:
                 performer_data = ProfileSerializer(performer).data
                 performer_data['distance_km'] = round(distance, 2)
-                performer_data['services_list'] = performer.get_services_list() if hasattr(performer, 'get_services_list') else []
+                performer_data['services_list'] = performer.get_services_list() if hasattr(performer,
+                                                                                           'get_services_list') else []
                 results.append(performer_data)
 
         results.sort(key=lambda x: x['distance_km'])
@@ -287,7 +288,6 @@ class SearchViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='categories/(?P<category_slug>[^/.]+)/subcategories')
     def get_subcategories(self, request, category_slug=None):
-        """Получение подкатегорий по слагу категории"""
         if not category_slug:
             return Response({'error': 'Категория не указана'}, status=400)
 
@@ -360,7 +360,8 @@ def profile_view(request):
         return redirect('profile')
 
     orders_as_client = Order.objects.filter(client=request.user).order_by('-created_at')[:10]
-    orders_as_performer = Order.objects.filter(performer=request.user).order_by('-created_at')[:10] if profile.role == 'performer' else []
+    orders_as_performer = Order.objects.filter(performer=request.user).order_by('-created_at')[
+        :10] if profile.role == 'performer' else []
 
     context = {
         'profile': profile,
@@ -513,7 +514,8 @@ def create_order_view(request):
                     message=f'Вам поступил заказ "{title}" от {request.user.username}. Бюджет: {budget} ₽. Примите или отклоните заказ.'
                 )
 
-                messages.success(request, f'Заказ "{title}" отправлен исполнителю {performer_user.username}. Ожидайте подтверждения!')
+                messages.success(request,
+                                 f'Заказ "{title}" отправлен исполнителю {performer_user.username}. Ожидайте подтверждения!')
             except User.DoesNotExist:
                 messages.warning(request, 'Заказ создан, но исполнитель не найден')
         else:
@@ -620,6 +622,112 @@ def confirm_order_view(request, order_id):
         messages.error(request, 'Заказ не найден или уже подтвержден')
 
     return redirect('my_orders')
+
+
+@login_required
+def approve_cancel_view(request, order_id):
+    try:
+        order = Order.objects.get(id=order_id, performer=request.user)
+
+        if not order.cancel_requested:
+            messages.error(request, 'Нет запроса на отмену от заказчика')
+            return redirect('my_orders')
+
+        if order.status != 'accepted':
+            messages.error(request, 'Заказ не в статусе "принят"')
+            return redirect('my_orders')
+
+        order.status = 'cancelled'
+        order.cancel_requested = False
+        order.save()
+
+        Notification.objects.create(
+            user=order.client,
+            order=order,
+            type='order_cancelled',
+            title='Заказ отменен',
+            message=f'Исполнитель {request.user.username} одобрил отмену заказа "{order.title}"'
+        )
+
+        messages.success(request, f'Заказ "{order.title}" отменен')
+        return redirect('my_orders')
+
+    except Order.DoesNotExist:
+        messages.error(request, 'Заказ не найден')
+        return redirect('my_orders')
+
+
+@login_required
+def cancel_order_view(request, order_id):
+    try:
+        order = Order.objects.get(id=order_id)
+
+        if order.client != request.user and order.performer != request.user:
+            messages.error(request, 'У вас нет прав для отмены этого заказа')
+            return redirect('my_orders')
+
+        if request.user == order.client:
+            if order.status == 'completed':
+                messages.error(request, 'Заказ уже завершен, отмена невозможна')
+                return redirect('my_orders')
+            elif order.status == 'cancelled':
+                messages.error(request, 'Заказ уже отменен')
+                return redirect('my_orders')
+            elif order.status == 'pending':
+                order.status = 'cancelled'
+                order.save()
+                if order.performer:
+                    Notification.objects.create(
+                        user=order.performer,
+                        order=order,
+                        type='order_cancelled',
+                        title='Заказ отменен',
+                        message=f'Заказчик {request.user.username} отменил заказ "{order.title}"'
+                    )
+                messages.success(request, f'Заказ "{order.title}" отменен')
+            elif order.status == 'accepted':
+                reason = request.POST.get('reason', '')
+                if not reason:
+                    messages.error(request, 'Укажите причину отмены заказа')
+                    return redirect('my_orders')
+
+                order.cancel_requested = True
+                order.save()
+
+                Notification.objects.create(
+                    user=order.performer,
+                    order=order,
+                    type='order_cancelled',
+                    title='Запрос на отмену заказа',
+                    message=f'Заказчик {request.user.username} просит отменить заказ "{order.title}". Причина: {reason}'
+                )
+                messages.info(request, f'Запрос на отмену заказа "{order.title}" отправлен исполнителю')
+            else:
+                messages.error(request, 'Невозможно отменить заказ в текущем статусе')
+
+        elif request.user == order.performer:
+            if order.status == 'accepted':
+                messages.error(request, 'Вы уже приняли заказ. Для отмены свяжитесь с заказчиком.')
+                return redirect('my_orders')
+            elif order.status == 'pending':
+                order.status = 'cancelled'
+                order.save()
+                Notification.objects.create(
+                    user=order.client,
+                    order=order,
+                    type='order_cancelled',
+                    title='Заказ отменен исполнителем',
+                    message=f'Исполнитель {request.user.username} отменил заказ "{order.title}"'
+                )
+                messages.success(request, f'Заказ "{order.title}" отменен')
+            else:
+                messages.error(request, 'Невозможно отменить заказ в текущем статусе')
+
+        return redirect('my_orders')
+
+    except Order.DoesNotExist:
+        messages.error(request, 'Заказ не найден')
+        return redirect('my_orders')
 
 
 class NotificationViewSet(viewsets.ModelViewSet):

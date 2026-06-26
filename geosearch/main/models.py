@@ -114,6 +114,7 @@ class Order(models.Model):
 
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders_as_client')
     performer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders_as_performer')
+    cancel_requested = models.BooleanField(default=False)
 
     title = models.CharField(max_length=200)
     description = models.TextField()

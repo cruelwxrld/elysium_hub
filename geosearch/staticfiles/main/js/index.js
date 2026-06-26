@@ -1,0 +1,489 @@
+// index.js — без хардкода
+
+let map;
+let userPlacemark;
+let performerPlacemarks = [];
+let currentLocation = null;
+
+function closeModal() {
+    const authModal = document.getElementById('authModal');
+    const registerModal = document.getElementById('registerModal');
+    const modalOverlay = document.getElementById('modalOverlay');
+    if (authModal) authModal.style.display = 'none';
+    if (registerModal) registerModal.style.display = 'none';
+    if (modalOverlay) modalOverlay.style.display = 'none';
+}
+
+function switchToRegister() {
+    closeModal();
+    const registerModal = document.getElementById('registerModal');
+    if (registerModal) registerModal.style.display = 'flex';
+}
+
+function switchToLogin() {
+    closeModal();
+    const authModal = document.getElementById('authModal');
+    if (authModal) authModal.style.display = 'flex';
+}
+
+document.addEventListener('click', function(event) {
+    const authModal = document.getElementById('authModal');
+    const registerModal = document.getElementById('registerModal');
+    if (event.target === authModal) closeModal();
+    if (event.target === registerModal) closeModal();
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') closeModal();
+});
+
+async function login() {
+    const username = document.getElementById('loginUsername').value;
+    const password = document.getElementById('loginPassword').value;
+
+    if (!username || !password) {
+        showNotification('Заполните все поля', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/auth/login/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            localStorage.setItem('authToken', data.token);
+            localStorage.setItem('username', data.username);
+            localStorage.setItem('userId', data.user_id);
+            localStorage.setItem('userRole', data.role);
+            document.cookie = `auth_token=${data.token}; path=/; max-age=86400`;
+            showNotification(`Добро пожаловать, ${data.username}!`, 'success');
+            closeModal();
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 500);
+        } else {
+            showNotification(data.error || 'Ошибка входа', 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showNotification('Ошибка соединения', 'error');
+    }
+}
+
+async function register() {
+    const username = document.getElementById('regUsername').value;
+    const password = document.getElementById('regPassword').value;
+    const password2 = document.getElementById('regPassword2').value;
+    const email = document.getElementById('regEmail').value;
+    const phone = document.getElementById('regPhone').value;
+    const role = document.getElementById('regRole').value;
+
+    if (!username || !password) {
+        showNotification('Заполните обязательные поля', 'error');
+        return;
+    }
+
+    if (password !== password2) {
+        showNotification('Пароли не совпадают', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/auth/register/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, email, phone, role })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            localStorage.setItem('authToken', data.token);
+            localStorage.setItem('username', data.username);
+            localStorage.setItem('userId', data.user_id);
+            localStorage.setItem('userRole', data.role);
+            document.cookie = `auth_token=${data.token}; path=/; max-age=86400`;
+            showNotification('Регистрация успешна!', 'success');
+            closeModal();
+            window.location.href = '/';
+        } else {
+            showNotification(data.error || 'Ошибка регистрации', 'error');
+        }
+    } catch (error) {
+        showNotification('Ошибка соединения', 'error');
+    }
+}
+
+function waitForYmaps() {
+    return new Promise((resolve) => {
+        if (typeof ymaps !== 'undefined') {
+            ymaps.ready(resolve);
+        } else {
+            setTimeout(() => waitForYmaps().then(resolve), 100);
+        }
+    });
+}
+
+async function initMap() {
+    await waitForYmaps();
+    map = new ymaps.Map('map', {
+        center: [55.751244, 37.618423],
+        zoom: 12,
+        controls: ['zoomControl', 'fullscreenControl', 'typeSelector']
+    });
+    setTimeout(() => getUserLocation(), 500);
+}
+
+function getUserLocation() {
+    if (navigator.geolocation) {
+        showNotification('Определяем местоположение...');
+        navigator.geolocation.getCurrentPosition(
+            (position) => setUserLocation(position.coords.latitude, position.coords.longitude),
+            () => setUserLocation(55.751244, 37.618423)
+        );
+    } else {
+        setUserLocation(55.751244, 37.618423);
+    }
+}
+
+function setUserLocation(lat, lng) {
+    currentLocation = { lat, lng };
+    if (userPlacemark) map.geoObjects.remove(userPlacemark);
+    userPlacemark = new ymaps.Placemark([lat, lng], {
+        balloonContent: 'Вы здесь',
+        hintContent: 'Ваше местоположение'
+    }, { preset: 'islands#blueCircleIcon', iconColor: '#6366f1' });
+    map.geoObjects.add(userPlacemark);
+    map.setCenter([lat, lng], 14);
+    updateRadiusCircle();
+    searchPerformers();
+}
+
+async function loadSearchSubcategories() {
+    const category = document.getElementById('category').value;
+    const subcategoryGroup = document.getElementById('searchSubcategoryGroup');
+    const subcategorySelect = document.getElementById('searchSubcategory');
+
+    if (!category) {
+        if (subcategoryGroup) subcategoryGroup.style.display = 'none';
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/categories/${category}/subcategories/`);
+        const data = await response.json();
+
+        if (subcategorySelect) {
+            subcategorySelect.innerHTML = '<option value="">Любая услуга</option>';
+            if (data.subcategories && data.subcategories.length > 0) {
+                data.subcategories.forEach(sub => {
+                    subcategorySelect.innerHTML += `<option value="${sub.name}">${sub.name}</option>`;
+                });
+                if (subcategoryGroup) subcategoryGroup.style.display = 'block';
+            } else {
+                if (subcategoryGroup) subcategoryGroup.style.display = 'none';
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки подкатегорий:', error);
+        if (subcategoryGroup) subcategoryGroup.style.display = 'none';
+    }
+}
+
+function updateRadiusCircle() {
+    if (!currentLocation) return;
+    const radius = document.getElementById('radius').value;
+    if (window.radiusCircle) map.geoObjects.remove(window.radiusCircle);
+    window.radiusCircle = new ymaps.Circle([
+        [currentLocation.lat, currentLocation.lng],
+        radius * 1000
+    ], {}, {
+        fillColor: '#6366f120',
+        strokeColor: '#6366f1',
+        strokeWidth: 2
+    });
+    map.geoObjects.add(window.radiusCircle);
+}
+
+async function searchPerformers() {
+    if (!currentLocation) {
+        showNotification('Сначала определите местоположение', 'error');
+        return;
+    }
+
+    const resultsList = document.getElementById('resultsList');
+    if (resultsList) {
+        resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Поиск...</p></div>';
+    }
+    updateRadiusCircle();
+
+    const radius = document.getElementById('radius').value;
+    const category = document.getElementById('category').value;
+    const subcategory = document.getElementById('searchSubcategory').value;
+
+    let url = `/api/search/find_performers/?lat=${currentLocation.lat}&lng=${currentLocation.lng}&radius=${radius}`;
+    if (category) url += `&category=${category}`;
+    if (subcategory) url += `&service=${encodeURIComponent(subcategory)}`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        displayPerformers(data.results || []);
+        addMarkersToMap(data.results || []);
+    } catch (error) {
+        console.error('Ошибка поиска:', error);
+        if (resultsList) {
+            resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Ошибка загрузки</p></div>';
+        }
+    }
+}
+
+function displayPerformers(performers) {
+    const resultsList = document.getElementById('resultsList');
+    const resultsCount = document.getElementById('resultsCount');
+
+    if (resultsCount) resultsCount.textContent = performers.length;
+
+    if (!resultsList) return;
+
+    if (performers.length === 0) {
+        resultsList.innerHTML = '<div class="empty-state"><i class="fas fa-frown"></i><p>Исполнителей не найдено</p></div>';
+        return;
+    }
+
+    const categoryMap = {
+        'cleaning': '🧹 Уборка', 'repair': '🔧 Ремонт', 'delivery': '🚚 Доставка',
+        'construction': '🏗️ Строительство', 'design': '🎨 Дизайн', 'photography': '📸 Фотография',
+        'it': '💻 IT', 'education': '📚 Образование', 'beauty': '💅 Красота'
+    };
+
+    resultsList.innerHTML = performers.map(p => `
+        <div class="performer-card" onclick="showPerformerDetails(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+            <div class="card-header">
+                <div class="performer-name">
+                    <i class="fas fa-user-circle"></i> ${p.username || 'Исполнитель'}
+                    ${p.rating >= 4.5 ? '<span class="pro-badge">PRO</span>' : ''}
+                </div>
+                <div class="rating">
+                    ${'★'.repeat(Math.floor(p.rating))}${'☆'.repeat(5 - Math.floor(p.rating))}
+                    <span>${p.rating}</span>
+                </div>
+            </div>
+            <div class="card-details">
+                <span class="category-badge"><i class="fas fa-tag"></i> ${categoryMap[p.category] || p.category || 'Разное'}</span>
+                <span class="price"><i class="fas fa-ruble-sign"></i> ${p.price || 'Договорная'}/час</span>
+                <span><i class="fas fa-location-dot"></i> ${p.distance_km} км</span>
+            </div>
+            ${p.services_list && p.services_list.length > 0 ? `
+            <div class="services-list">
+                <i class="fas fa-list-check"></i>
+                ${p.services_list.slice(0, 3).map(s => `<span class="service-tag">${s.length > 25 ? s.substring(0, 25) + '...' : s}</span>`).join('')}
+                ${p.services_list.length > 3 ? `<span class="service-tag">+${p.services_list.length - 3}</span>` : ''}
+            </div>
+            ` : ''}
+            <div class="order-count">
+                <i class="fas fa-check-circle"></i> ${p.completed_orders || 0} заказов выполнено
+            </div>
+        </div>
+    `).join('');
+
+    const resultsPanel = document.getElementById('resultsPanel');
+    if (resultsPanel) resultsPanel.classList.remove('minimized');
+}
+
+function addMarkersToMap(performers) {
+    performerPlacemarks.forEach(p => map.geoObjects.remove(p));
+    performerPlacemarks = [];
+    performers.forEach(p => {
+        if (p.latitude && p.longitude) {
+            const placemark = new ymaps.Placemark([p.latitude, p.longitude], {
+                balloonContent: `<strong>${p.username}</strong><br>⭐ ${p.rating}<br>💰 ${p.price} ₽/час`,
+                hintContent: p.username
+            }, { preset: 'islands#greenBusinessIcon' });
+            map.geoObjects.add(placemark);
+            performerPlacemarks.push(placemark);
+        }
+    });
+}
+
+function showPerformerDetails(performer) {
+    const modal = document.getElementById('modalOverlay');
+    if (!modal) return;
+
+    const categoryMap = {
+        'cleaning': 'Уборка', 'repair': 'Ремонт', 'delivery': 'Доставка',
+        'construction': 'Строительство', 'design': 'Дизайн', 'photography': 'Фотография',
+        'it': 'IT', 'education': 'Образование', 'beauty': 'Красота'
+    };
+
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2><i class="fas fa-user-circle"></i> ${performer.username}</h2>
+                <button onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+            </div>
+            <div style="margin-bottom: 16px;">
+                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;"><i class="fas fa-star"></i> ${performer.rating || 0}</span>
+                    <span style="background: #f3f4f6; padding: 4px 12px; border-radius: 20px;"><i class="fas fa-phone"></i> ${performer.phone || 'Не указан'}</span>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <strong><i class="fas fa-tag"></i> Категория:</strong> ${categoryMap[performer.category] || performer.category || 'Разное'}
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <strong><i class="fas fa-ruble-sign"></i> Цена:</strong> ${performer.price || 'Договорная'} ₽/час
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <strong><i class="fas fa-check-circle"></i> Заказов выполнено:</strong> ${performer.completed_orders || 0}
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <strong><i class="fas fa-info-circle"></i> О себе:</strong><br>
+                    ${performer.description || 'Информация не указана'}
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="/create-order/?performer_id=${performer.id}" class="btn btn-primary" style="flex: 1; text-align: center; text-decoration: none;">
+                    <i class="fas fa-shopping-cart"></i> Заказать услугу
+                </a>
+                <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal()">
+                    <i class="fas fa-times"></i> Закрыть
+                </button>
+            </div>
+        </div>
+    `;
+    modal.style.display = 'flex';
+}
+
+async function createOrder(performerId) {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+        showNotification('Сначала войдите в аккаунт', 'error');
+        closeModal();
+        showAuthModal();
+        return;
+    }
+    const title = prompt('Название заказа:');
+    if (!title) return;
+    const description = prompt('Описание:');
+    if (!description) return;
+    const budget = prompt('Бюджет:');
+    if (!budget) return;
+
+    try {
+        const response = await fetch('/api/orders/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Token ${token}`
+            },
+            body: JSON.stringify({
+                title, description, budget,
+                category: document.getElementById('category')?.value || 'other',
+                performer: performerId,
+                latitude: currentLocation.lat,
+                longitude: currentLocation.lng,
+                address: 'По адресу'
+            })
+        });
+        if (response.ok) {
+            showNotification('Заказ создан!', 'success');
+            closeModal();
+        } else {
+            const data = await response.json();
+            showNotification(data.error || 'Ошибка создания', 'error');
+        }
+    } catch (error) {
+        showNotification('Ошибка соединения', 'error');
+    }
+}
+
+function logout() {
+    const functionalAllowed = getCookie('cookie_functional') === 'true';
+    if (functionalAllowed) {
+        document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+    }
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('username');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userRole');
+    showNotification('Вы вышли из системы', 'info');
+    setTimeout(function() {
+        window.location.href = '/';
+    }, 500);
+}
+
+function toggleSearchPanel() {
+    const panel = document.getElementById('searchPanel');
+    const icon = document.getElementById('searchToggleIcon');
+    const span = document.querySelector('#searchPanel .search-header h3 span');
+
+    if (!panel) return;
+
+    panel.classList.toggle('minimized');
+
+    if (panel.classList.contains('minimized')) {
+        if (icon) {
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        }
+        if (span) span.style.display = 'none';
+    } else {
+        if (icon) {
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+        }
+        if (span) span.style.display = 'inline';
+    }
+}
+
+function toggleResultsPanel() {
+    const panel = document.getElementById('resultsPanel');
+    if (panel) panel.classList.toggle('minimized');
+}
+
+const radiusInput = document.getElementById('radius');
+if (radiusInput) {
+    radiusInput.addEventListener('input', (e) => {
+        const radiusValue = document.getElementById('radiusValue');
+        if (radiusValue) radiusValue.textContent = e.target.value;
+        if (currentLocation && window.radiusCircle) {
+            map.geoObjects.remove(window.radiusCircle);
+            window.radiusCircle = new ymaps.Circle([[currentLocation.lat, currentLocation.lng], e.target.value * 1000], {}, {
+                fillColor: '#6366f120',
+                strokeColor: '#6366f1',
+                strokeWidth: 2
+            });
+            map.geoObjects.add(window.radiusCircle);
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const categorySelect = document.getElementById('category');
+    if (categorySelect) {
+        categorySelect.addEventListener('change', function() {
+            loadSearchSubcategories();
+            searchPerformers();
+        });
+    }
+
+    const subcategorySelect = document.getElementById('searchSubcategory');
+    if (subcategorySelect) {
+        subcategorySelect.addEventListener('change', searchPerformers);
+    }
+
+    loadSearchSubcategories();
+
+    if (window.location.pathname === '/' || window.location.pathname === '') {
+        document.body.classList.add('home-page');
+    }
+});
+
+window.onload = initMap;
